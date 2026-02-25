@@ -1,168 +1,107 @@
-# 🏛️ LegalClaw - Assistente Jurídico com IA
+# ⚖️ DrLex — Assistente Jurídico com IA
 
-<div align="center">
+**Dr. + Lex** (do latim *lex* = lei). Assistente jurídico inteligente para advogados e escritórios brasileiros.
 
-![LegalClaw Logo](https://img.shields.io/badge/LegalClaw-⚖️-blue?style=for-the-badge)
-[![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)](LICENSE)
-[![Node.js](https://img.shields.io/badge/node.js-18+-brightgreen?style=for-the-badge&logo=node.js)](https://nodejs.org)
-[![Docker](https://img.shields.io/badge/docker-ready-blue?style=for-the-badge&logo=docker)](https://www.docker.com)
-[![Portainer](https://img.shields.io/badge/portainer-compatible-13BEF9?style=for-the-badge&logo=portainer)](https://www.portainer.io)
-
-**Assistente jurídico com IA acessível via WhatsApp e Telegram**
-
-Sistema completo de assistente jurídico baseado em OpenClaw, focado no mercado brasileiro.
-
-## 📌 Visão Geral
-
-LegalClaw é um assistente de IA especializado em atividades jurídicas e compliance, acessível via WhatsApp e Telegram, que automatiza:
-
-- ⚖️ Monitoramento de Diários Oficiais (DOU, DOE, DOM)
-- 📄 Análise inteligente de contratos
-- 📅 Gestão de prazos processuais
-- 🔍 Pesquisa de jurisprudência
-- 📊 Relatórios de compliance
-- 🤖 Geração de documentos jurídicos
-
-## 🏗️ Arquitetura
-
-```
-legal-ai-assistant/
-├── core/                      # Motor principal
-│   ├── openclaw-setup/       # Configuração OpenClaw
-│   ├── skills/               # Skills customizadas
-│   └── integrations/         # Integrações externas
-├── services/                  # Serviços especializados
-│   ├── diario-monitor/       # Monitor diários oficiais
-│   ├── contract-analyzer/    # Análise de contratos
-│   ├── deadline-manager/     # Gestão de prazos
-│   └── jurisprudence/        # Pesquisa jurisprudência
-├── infra/                     # Infraestrutura
-│   ├── docker/               # Containers
-│   ├── cloud/                # Deployment cloud
-│   └── monitoring/           # Logs e métricas
-├── api/                       # API REST (opcional)
-├── dashboard/                 # Interface web
-└── docs/                      # Documentação
-```
-
-## 🚀 Quick Start
-
-### Pré-requisitos
-
-- Node.js 18+
-- Python 3.10+
-- OpenClaw
-- Conta WhatsApp Business / Telegram Bot
-
-### Instalação
-
-```bash
-# 1. Clone o repositório
-git clone https://github.com/seu-usuario/legal-ai-assistant.git
-cd legal-ai-assistant
-
-# 2. Instale dependências
-npm install
-pip install -r requirements.txt
-
-# 3. Configure variáveis de ambiente
-cp .env.example .env
-# Edite .env com suas credenciais
-
-# 4. Instale OpenClaw
-npm install -g openclaw
-
-# 5. Configure o assistente
-npm run setup
-
-# 6. Inicie o sistema
-npm run start
-```
-
-## 💰 Modelo de Negócio
-
-### Planos
-
-**Solo** - R$ 197/mês
-- 1 instância do assistente
-- Alertas de diários oficiais
-- Análise básica de contratos
-- Calendário de prazos
-- Suporte por chat
-
-**Escritório** - R$ 497/mês
-- 3 instâncias simultâneas
-- Análise avançada de contratos
-- Pesquisa de jurisprudência
-- Gerador de petições
-- Dashboard web
-- Suporte prioritário
-
-**Enterprise** - R$ 1.997/mês
-- Instâncias ilimitadas
-- API dedicada
-- Compliance corporativo
-- Integrações customizadas
-- White-label disponível
-- Suporte 24/7
-
-## 🎯 Roadmap
-
-### Fase 1: MVP (4 semanas)
-- [x] Estrutura base do projeto
-- [ ] Configuração OpenClaw
-- [ ] Skills jurídicas básicas
-- [ ] Integração WhatsApp
-- [ ] Integração Telegram
-- [ ] Monitor DOU básico
-- [ ] Análise simples de contratos
-
-### Fase 2: Features Core (6 semanas)
-- [ ] Gestão de prazos com alertas
-- [ ] Base de conhecimento RAG
-- [ ] Pesquisa jurisprudência STF/STJ
-- [ ] Gerador de documentos
-- [ ] Dashboard web
-
-### Fase 3: Escala (8 semanas)
-- [ ] Multi-tenancy
-- [ ] API REST completa
-- [ ] Integrações software jurídico
-- [ ] Analytics e relatórios
-- [ ] Compliance automatizado
-
-## 🛠️ Tecnologias
-
-- **IA**: OpenClaw, Claude Sonnet 4.5
-- **Backend**: Node.js, Python, FastAPI
-- **Frontend**: React, Next.js, Tailwind
-- **Database**: PostgreSQL, Redis
-- **Messaging**: Twilio (WhatsApp), Telegram Bot API
-- **Deploy**: Docker, AWS/GCP
-- **Monitoring**: Sentry, Datadog
-
-## 📚 Documentação
-
-- [Guia de Instalação](./docs/installation.md)
-- [Configuração de Skills](./docs/skills.md)
-- [Integrações](./docs/integrations.md)
-- [API Reference](./docs/api.md)
-- [Troubleshooting](./docs/troubleshooting.md)
-
-## 🤝 Contribuindo
-
-Contribuições são bem-vindas! Veja [CONTRIBUTING.md](./CONTRIBUTING.md)
-
-## 📄 Licença
-
-Proprietary - Todos os direitos reservados
-
-## 📞 Contato
-
-- Email: contato@legalclaw.com.br
-- WhatsApp: +55 11 9xxxx-xxxx
-- Website: https://legalclaw.com.br
+Análise de contratos, gestão de prazos processuais, monitoramento de diários oficiais — tudo via WhatsApp, Telegram e API REST.
 
 ---
 
-Feito com ⚖️ e 🦞 por [Seu Nome]
+## 🚀 Funcionalidades
+
+- **📄 Análise de Contratos** — Identifica cláusulas abusivas, riscos, cita artigos de lei e sugere correções
+- **📅 Gestão de Prazos** — Cálculo automático em dias úteis (CPC), feriados nacionais, alertas automáticos
+- **📰 Monitor de Diários Oficiais** — Varredura automática do DOU/DOE/DOM com alertas por palavra-chave
+- **💬 WhatsApp** — Via Evolution API (WhatsApp real, sem sandbox)
+- **🤖 Telegram** — Bot completo com comandos
+- **🔌 API REST** — Integração com qualquer sistema
+
+## 🏗️ Stack
+
+| Componente | Tecnologia |
+|---|---|
+| Backend | Node.js 18 + Express |
+| IA | Anthropic Claude (SDK direto) |
+| Banco de dados | PostgreSQL 15 |
+| Cache | Redis 7 |
+| WhatsApp | Evolution API |
+| Telegram | Telegraf |
+| Deploy | Docker + Portainer |
+
+## 📂 Estrutura
+
+```
+drlex/
+├── src/
+│   ├── index.js                  # Servidor Express + cron jobs
+│   ├── config/
+│   │   ├── index.js              # Configuração centralizada
+│   │   └── migrate.js            # Migrações PostgreSQL
+│   ├── services/
+│   │   ├── ai.js                 # Anthropic Claude SDK direto
+│   │   ├── contract-analyzer.js  # Análise de contratos
+│   │   ├── deadline-manager.js   # Prazos processuais (dias úteis)
+│   │   ├── diario-monitor.js     # Monitor DOU/DOE/DOM
+│   │   └── chat-handler.js       # Roteador de mensagens
+│   ├── integrations/
+│   │   ├── evolution.js          # WhatsApp via Evolution API
+│   │   └── telegram.js           # Bot Telegram
+│   ├── routes/
+│   │   ├── api.js                # Rotas REST
+│   │   └── webhooks.js           # Webhooks da Evolution
+│   └── utils/
+│       └── logger.js             # Winston logger
+├── docker-compose.yml
+├── portainer-stack.yml
+├── Dockerfile
+└── .env.example
+```
+
+## ⚡ Deploy Rápido (Portainer)
+
+1. Clone no servidor:
+```bash
+git clone https://github.com/oliveermarcelo/legalclaw.git /var/data/drlex/app
+```
+
+2. Configure as credenciais:
+```bash
+cp .env.example .env
+nano .env  # Preencher ANTHROPIC_API_KEY, EVOLUTION_API_KEY, etc.
+```
+
+3. Descubra a rede da Evolution API:
+```bash
+bash discover-evolution.sh
+```
+
+4. No Portainer: **Stacks → Add Stack → Cole o `portainer-stack.yml`**
+
+5. Teste:
+```bash
+curl http://localhost:3000/health
+```
+
+## 🔌 API Endpoints
+
+| Método | Rota | Descrição |
+|---|---|---|
+| GET | `/health` | Status dos serviços |
+| POST | `/api/contracts/analyze` | Analisar contrato |
+| POST | `/api/deadlines` | Criar prazo |
+| POST | `/api/deadlines/calculate` | Calcular prazo (sem salvar) |
+| GET | `/api/deadlines/tipos/cpc` | Prazos padrão do CPC |
+| POST | `/api/diarios/search` | Buscar no DOU |
+| POST | `/api/diarios/monitor` | Criar monitor |
+| POST | `/api/chat` | Chat com IA |
+
+## 💰 Planos
+
+| Plano | Preço | Contratos | Diários |
+|---|---|---|---|
+| Solo | R$ 197/mês | 50/mês | DOU |
+| Escritório | R$ 497/mês | 200/mês | DOU+DOE+DOM |
+| Enterprise | R$ 1.997/mês | Ilimitado | Todos + API + White-label |
+
+## 📜 Licença
+
+Proprietário — Todos os direitos reservados.

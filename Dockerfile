@@ -1,42 +1,20 @@
 FROM node:18-alpine
 
-# Instalar dependências do sistema
-RUN apk add --no-cache \
-    python3 \
-    py3-pip \
-    make \
-    g++ \
-    git \
-    curl
-
-# Criar diretório da aplicação
 WORKDIR /app
 
-# Copiar arquivos de dependências
-COPY package*.json ./
+# Instalar dependências primeiro (cache do Docker)
+COPY package.json package-lock.json* ./
+RUN npm ci --omit=dev 2>/dev/null || npm install --omit=dev
 
-# Instalar dependências
-RUN npm ci --only=production
-
-# Copiar código fonte
+# Copiar código
 COPY . .
 
-# Criar diretórios necessários
-RUN mkdir -p logs data
-
-# Instalar OpenClaw globalmente
-RUN npm install -g openclaw
-
-# Expor portas
+# Porta da API
 EXPOSE 3000
 
-# Variáveis de ambiente padrão
-ENV NODE_ENV=production
-ENV LOG_LEVEL=info
-
 # Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000/health', (r) => r.statusCode === 200 ? process.exit(0) : process.exit(1))"
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+  CMD wget -qO- http://localhost:3000/health || exit 1
 
-# Comando de inicialização
+# Iniciar
 CMD ["node", "src/index.js"]

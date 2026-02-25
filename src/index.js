@@ -1,299 +1,194 @@
-/**
- * LEGALCLAW - Sistema Principal
- * 
- * Orquestra todos os componentes do assistente jurídico
- */
-
-require('dotenv').config();
 const express = require('express');
-const winston = require('winston');
+const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const cron = require('node-cron');
 
-// Importar componentes
-const WhatsAppIntegration = require('./core/integrations/whatsapp');
-const TelegramIntegration = require('./core/integrations/telegram');
-const { ContractAnalyzer } = require('./core/skills/contract-analyzer');
-const { DiarioMonitor } = require('./core/skills/diario-monitor');
-const { DeadlineManager } = require('./core/skills/deadline-manager');
+const config = require('./config');
+const logger = require('./utils/logger');
+const { pool, migrate } = require('./config/migrate');
+const apiRoutes = require('./routes/api');
+const webhookRoutes = require('./routes/webhooks');
+const evolution = require('./integrations/evolution');
+const telegram = require('./integrations/telegram');
+const deadlineManager = require('./services/deadline-manager');
+const diarioMonitor = require('./services/diario-monitor');
 
-// Configurar logger
-const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || 'info',
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.json()
-  ),
-  transports: [
-    new winston.transports.File({ filename: 'logs/error.log', level: 'error' }),
-    new winston.transports.File({ filename: 'logs/combined.log' }),
-    new winston.transports.Console({
-      format: winston.format.combine(
-        winston.format.colorize(),
-        winston.format.simple()
-      )
-    })
-  ]
+const app = express();
+
+// ============================================================
+// MIDDLEWARE
+// ============================================================
+
+app.use(helmet());
+app.use(cors());
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ extended: true }));
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 min
+  max: 100,
+  message: { error: 'Muitas requisições, tente novamente em 15 minutos' },
+});
+app.use('/api/', limiter);
+
+// Request logging
+app.use((req, res, next) => {
+  if (req.path !== '/health') {
+    logger.debug(`${req.method} ${req.path}`);
+  }
+  next();
 });
 
-class LegalClaw {
-  constructor() {
-    this.config = {
-      port: process.env.API_PORT || 3000,
-      enableWhatsApp: process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN,
-      enableTelegram: process.env.TELEGRAM_BOT_TOKEN,
-      enableDiarioMonitor: process.env.ENABLE_DIARIO_MONITOR === 'true',
-      enableDeadlineAlerts: process.env.ENABLE_DEADLINE_MANAGER === 'true'
-    };
+// ============================================================
+// ROTAS
+// ============================================================
 
-    this.app = express();
-    this.setupMiddleware();
-    
-    // Componentes
-    this.whatsapp = null;
-    this.telegram = null;
-    this.contractAnalyzer = new ContractAnalyzer();
-    this.diarioMonitor = null;
-    this.deadlineManager = new DeadlineManager();
-    
-    this.sessions = new Map();
-  }
+// Health check
+app.get('/health', async (req, res) => {
+  const checks = { api: 'ok' };
 
-  setupMiddleware() {
-    this.app.use(express.json());
-    this.app.use(express.urlencoded({ extended: true }));
-    
-    // Logging
-    this.app.use((req, res, next) => {
-      logger.info(`${req.method} ${req.path}`);
-      next();
-    });
-
-    // Health check
-    this.app.get('/health', (req, res) => {
-      res.json({
-        status: 'ok',
-        timestamp: new Date().toISOString(),
-        services: {
-          whatsapp: !!this.whatsapp,
-          telegram: !!this.telegram,
-          diarioMonitor: !!this.diarioMonitor
-        }
-      });
-    });
-  }
-
-  async initialize() {
-    logger.info('🚀 Inicializando LegalClaw...');
-
-    try {
-      // Inicializar WhatsApp
-      if (this.config.enableWhatsApp) {
-        logger.info('📱 Configurando WhatsApp...');
-        this.whatsapp = new WhatsAppIntegration();
-        this.whatsapp.setupWebhook(this.app);
-        logger.info('✅ WhatsApp configurado');
-      }
-
-      // Inicializar Telegram
-      if (this.config.enableTelegram) {
-        logger.info('🤖 Configurando Telegram...');
-        this.telegram = new TelegramIntegration();
-        this.telegram.launch();
-        logger.info('✅ Telegram configurado');
-      }
-
-      // Inicializar Monitor de Diários
-      if (this.config.enableDiarioMonitor) {
-        logger.info('📰 Configurando Monitor de Diários Oficiais...');
-        this.diarioMonitor = new DiarioMonitor({
-          checkInterval: process.env.DOU_CHECK_INTERVAL || '0 8 * * *',
-          keywords: (process.env.DOU_KEYWORDS || '').split(',').filter(Boolean)
-        });
-
-        // Handler para achados
-        this.diarioMonitor.startMonitoring((findings) => {
-          this.handleDiarioFindings(findings);
-        });
-        
-        logger.info('✅ Monitor de Diários configurado');
-      }
-
-      // Inicializar alertas de prazos
-      if (this.config.enableDeadlineAlerts) {
-        logger.info('⏰ Configurando alertas de prazos...');
-        this.setupDeadlineAlerts();
-        logger.info('✅ Alertas de prazos configurados');
-      }
-
-      logger.info('🎉 LegalClaw inicializado com sucesso!');
-
-    } catch (error) {
-      logger.error(`❌ Erro na inicialização: ${error.message}`);
-      throw error;
-    }
-  }
-
-  setupDeadlineAlerts() {
-    // Verificar prazos a cada hora
-    setInterval(() => {
-      const upcoming = this.deadlineManager.listUpcoming(7);
-      
-      upcoming.forEach(deadline => {
-        const daysLeft = this.deadlineManager.getBusinessDaysUntil(
-          new Date(deadline.deadline)
-        );
-
-        // Alertar quando faltar 7, 3 ou 1 dia
-        if ([7, 3, 1].includes(daysLeft)) {
-          this.sendDeadlineAlert(deadline, daysLeft);
-        }
-      });
-    }, 60 * 60 * 1000); // 1 hora
-  }
-
-  async sendDeadlineAlert(deadline, daysLeft) {
-    const message = this.deadlineManager.generateAlertMessage(deadline, `${daysLeft}d`);
-
-    // Enviar via WhatsApp
-    if (this.whatsapp && deadline.whatsappNumber) {
-      await this.whatsapp.sendMessage(deadline.whatsappNumber, message);
-    }
-
-    // Enviar via Telegram
-    if (this.telegram && deadline.telegramId) {
-      await this.telegram.sendMessage(deadline.telegramId, message);
-    }
-
-    logger.info(`📅 Alerta de prazo enviado: ${deadline.title} (${daysLeft} dias)`);
-  }
-
-  async handleDiarioFindings(findings) {
-    const alert = this.diarioMonitor.generateAlert(findings);
-    
-    logger.info(`📰 ${findings.length} publicações relevantes encontradas`);
-
-    // Enviar alertas para usuários configurados
-    const subscribers = this.getSubscribers('diario');
-    
-    for (const subscriber of subscribers) {
-      if (subscriber.whatsappNumber && this.whatsapp) {
-        await this.whatsapp.sendMessage(subscriber.whatsappNumber, alert);
-      }
-      
-      if (subscriber.telegramId && this.telegram) {
-        await this.telegram.sendMessage(subscriber.telegramId, alert);
-      }
-    }
-  }
-
-  getSubscribers(service) {
-    // Aqui você buscaria do banco de dados
-    // Por enquanto, retorna array vazio
-    return [];
-  }
-
-  // API Routes
-  setupRoutes() {
-    // Análise de contratos
-    this.app.post('/api/contracts/analyze', async (req, res) => {
-      try {
-        const { filePath, metadata } = req.body;
-        
-        const analysis = await this.contractAnalyzer.analyzeFromFile(
-          filePath,
-          metadata
-        );
-
-        res.json(analysis);
-      } catch (error) {
-        logger.error(`Erro na análise: ${error.message}`);
-        res.status(500).json({ error: error.message });
-      }
-    });
-
-    // Verificar diários
-    this.app.get('/api/diarios/check', async (req, res) => {
-      try {
-        if (!this.diarioMonitor) {
-          return res.status(400).json({ error: 'Monitor não habilitado' });
-        }
-
-        const findings = await this.diarioMonitor.check();
-        res.json({ findings });
-      } catch (error) {
-        logger.error(`Erro ao verificar diários: ${error.message}`);
-        res.status(500).json({ error: error.message });
-      }
-    });
-
-    // Listar prazos
-    this.app.get('/api/deadlines', async (req, res) => {
-      try {
-        const days = parseInt(req.query.days) || 30;
-        const deadlines = this.deadlineManager.listUpcoming(days);
-        res.json({ deadlines });
-      } catch (error) {
-        logger.error(`Erro ao listar prazos: ${error.message}`);
-        res.status(500).json({ error: error.message });
-      }
-    });
-
-    // Adicionar prazo
-    this.app.post('/api/deadlines', async (req, res) => {
-      try {
-        const deadline = this.deadlineManager.addDeadline(req.body);
-        res.json({ deadline });
-      } catch (error) {
-        logger.error(`Erro ao adicionar prazo: ${error.message}`);
-        res.status(500).json({ error: error.message });
-      }
-    });
-
-    // Calcular prazo
-    this.app.post('/api/deadlines/calculate', async (req, res) => {
-      try {
-        const result = this.deadlineManager.calculateDeadline(req.body);
-        res.json(result);
-      } catch (error) {
-        logger.error(`Erro ao calcular prazo: ${error.message}`);
-        res.status(500).json({ error: error.message });
-      }
-    });
-  }
-
-  start() {
-    this.setupRoutes();
-
-    this.app.listen(this.config.port, () => {
-      logger.info(`🌐 API rodando na porta ${this.config.port}`);
-      logger.info(`📱 WhatsApp: ${this.config.enableWhatsApp ? 'Ativo' : 'Inativo'}`);
-      logger.info(`🤖 Telegram: ${this.config.enableTelegram ? 'Ativo' : 'Inativo'}`);
-      logger.info(`📰 Monitor Diários: ${this.config.enableDiarioMonitor ? 'Ativo' : 'Inativo'}`);
-    });
-
-    // Graceful shutdown
-    process.on('SIGTERM', () => {
-      logger.info('⏸️  Encerrando gracefully...');
-      process.exit(0);
-    });
-  }
-}
-
-// Inicializar e executar
-async function main() {
-  const legalClaw = new LegalClaw();
-  
+  // PostgreSQL
   try {
-    await legalClaw.initialize();
-    legalClaw.start();
-  } catch (error) {
-    logger.error(`❌ Erro fatal: ${error.message}`);
+    await pool.query('SELECT 1');
+    checks.database = 'ok';
+  } catch {
+    checks.database = 'error';
+  }
+
+  // Evolution API (WhatsApp)
+  try {
+    const status = await evolution.getConnectionStatus();
+    checks.whatsapp = status?.state || status?.instance?.state || 'unknown';
+  } catch {
+    checks.whatsapp = 'unreachable';
+  }
+
+  const allOk = checks.database === 'ok';
+  res.status(allOk ? 200 : 503).json({
+    status: allOk ? 'ok' : 'degraded',
+    timestamp: new Date().toISOString(),
+    services: checks,
+  });
+});
+
+// API REST
+app.use('/api', apiRoutes);
+
+// Webhooks
+app.use('/webhooks', webhookRoutes);
+
+// 404
+app.use((req, res) => {
+  res.status(404).json({ error: 'Rota não encontrada' });
+});
+
+// Error handler
+app.use((err, req, res, next) => {
+  logger.error('Erro não tratado:', err);
+  res.status(500).json({ error: 'Erro interno do servidor' });
+});
+
+// ============================================================
+// CRON JOBS
+// ============================================================
+
+// Verificar prazos vencendo (diariamente às 8h)
+cron.schedule('0 8 * * *', async () => {
+  logger.info('Cron: Verificando prazos próximos...');
+  try {
+    const upcoming = await deadlineManager.getUpcoming(3);
+    for (const deadline of upcoming) {
+      const msg =
+        `⚠️ *Prazo se aproximando!*\n\n` +
+        `📋 ${deadline.description}\n` +
+        `📆 Vencimento: ${new Date(deadline.deadline_date).toLocaleDateString('pt-BR')}\n` +
+        `📁 Processo: ${deadline.process_number || 'N/A'}`;
+
+      if (deadline.whatsapp) {
+        try { await evolution.sendText(deadline.whatsapp, msg); } catch {}
+      }
+      if (deadline.telegram_id) {
+        try { await telegram.sendMessage(deadline.telegram_id, msg); } catch {}
+      }
+      await deadlineManager.markNotified(deadline.id);
+    }
+    logger.info(`Cron: ${upcoming.length} alertas de prazo enviados`);
+  } catch (err) {
+    logger.error('Cron prazos erro:', err.message);
+  }
+});
+
+// Varrer diários oficiais (diariamente às 7h)
+cron.schedule('0 7 * * 1-5', async () => {
+  logger.info('Cron: Varrendo diários oficiais...');
+  try {
+    const alerts = await diarioMonitor.runScan();
+    for (const alert of alerts) {
+      const msg =
+        `📰 *Publicação encontrada no ${alert.diario_type}!*\n\n` +
+        `🔍 Palavra-chave: "${alert.matched_keyword}"\n` +
+        `📄 ${alert.excerpt?.substring(0, 200)}\n` +
+        `🔗 ${alert.url}`;
+
+      if (alert.whatsapp) {
+        try { await evolution.sendText(alert.whatsapp, msg); } catch {}
+      }
+      if (alert.telegram_id) {
+        try { await telegram.sendMessage(alert.telegram_id, msg); } catch {}
+      }
+      await diarioMonitor.markNotified(alert.id);
+    }
+    logger.info(`Cron: ${alerts.length} alertas de diário enviados`);
+  } catch (err) {
+    logger.error('Cron diários erro:', err.message);
+  }
+});
+
+// ============================================================
+// INICIALIZAÇÃO
+// ============================================================
+
+async function start() {
+  try {
+    // 1. Migrar banco de dados
+    logger.info('Migrando banco de dados...');
+    await migrate();
+
+    // 2. Inicializar Evolution API (criar instância se necessário)
+    if (config.evolution.apiKey) {
+      logger.info('Configurando Evolution API...');
+      try {
+        const webhookUrl = `http://drlex-api:${config.port}/webhooks/evolution`;
+        await evolution.createInstance(webhookUrl);
+        const status = await evolution.getConnectionStatus();
+        logger.info('Evolution API status:', status?.state || 'configurada');
+      } catch (err) {
+        logger.warn('Evolution API não disponível (configurar depois):', err.message);
+      }
+    } else {
+      logger.warn('Evolution API: API Key não configurada');
+    }
+
+    // 3. Inicializar Telegram Bot
+    if (config.telegram.botToken) {
+      telegram.init();
+    } else {
+      logger.warn('Telegram: Bot token não configurado');
+    }
+
+    // 4. Iniciar servidor
+    app.listen(config.port, '0.0.0.0', () => {
+      logger.info(`🚀 Dr. Lex rodando na porta ${config.port}`);
+      logger.info(`📋 Health: http://localhost:${config.port}/health`);
+      logger.info(`📡 API: http://localhost:${config.port}/api`);
+      logger.info(`🔗 Webhooks: http://localhost:${config.port}/webhooks`);
+    });
+  } catch (err) {
+    logger.error('Falha ao iniciar DrLex:', err);
     process.exit(1);
   }
 }
 
-// Executar se for o arquivo principal
-if (require.main === module) {
-  main();
-}
-
-module.exports = LegalClaw;
+start();
