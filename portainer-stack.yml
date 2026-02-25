@@ -1,0 +1,193 @@
+version: '3.8'
+
+# ============================================
+# LegalClaw - Stack para Portainer
+# ============================================
+# 
+# Deploy Instructions:
+# 1. Portainer → Stacks → Add Stack
+# 2. Cole este arquivo
+# 3. Configure as variáveis de ambiente abaixo
+# 4. Deploy!
+#
+# ============================================
+
+services:
+  # ==========================================
+  # Aplicação Principal LegalClaw
+  # ==========================================
+  legalclaw:
+    image: node:18-alpine
+    container_name: legalclaw-app
+    restart: unless-stopped
+    working_dir: /app
+    
+    # Comando para instalar dependências e rodar
+    command: sh -c "npm install && node src/index.js"
+    
+    ports:
+      - "3000:3000"
+    
+    # IMPORTANTE: Configure estas variáveis no Portainer
+    environment:
+      # === OpenClaw / Claude ===
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENCLAW_MODEL=claude-sonnet-4-5-20250929
+      
+      # === WhatsApp (Twilio) ===
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}
+      - TWILIO_WHATSAPP_NUMBER=${TWILIO_WHATSAPP_NUMBER:-+14155238886}
+      
+      # === Telegram ===
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_ALLOWED_USERS=${TELEGRAM_ALLOWED_USERS:-}
+      
+      # === Database ===
+      - DATABASE_URL=postgresql://legalclaw:${DB_PASSWORD:-legalclaw123}@postgres:5432/legalclaw
+      - REDIS_URL=redis://redis:6379
+      
+      # === Features ===
+      - ENABLE_CONTRACT_ANALYSIS=true
+      - ENABLE_DIARIO_MONITOR=true
+      - ENABLE_DEADLINE_MANAGER=true
+      
+      # === Config ===
+      - NODE_ENV=production
+      - LOG_LEVEL=info
+      - API_PORT=3000
+    
+    volumes:
+      # Monte seu código aqui (ou use git clone)
+      - /var/data/legalclaw/app:/app
+      - /var/data/legalclaw/logs:/app/logs
+      - /var/data/legalclaw/data:/app/data
+    
+    depends_on:
+      - postgres
+      - redis
+    
+    networks:
+      - legalclaw-net
+    
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    labels:
+      - "com.legalclaw.description=LegalClaw Main Application"
+      - "com.legalclaw.service=app"
+
+  # ==========================================
+  # PostgreSQL Database
+  # ==========================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: legalclaw-postgres
+    restart: unless-stopped
+    
+    environment:
+      - POSTGRES_DB=legalclaw
+      - POSTGRES_USER=legalclaw
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-legalclaw123}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    
+    ports:
+      - "5432:5432"
+    
+    networks:
+      - legalclaw-net
+    
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U legalclaw"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    
+    labels:
+      - "com.legalclaw.description=PostgreSQL Database"
+      - "com.legalclaw.service=database"
+
+  # ==========================================
+  # Redis Cache
+  # ==========================================
+  redis:
+    image: redis:7-alpine
+    container_name: legalclaw-redis
+    restart: unless-stopped
+    
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-}
+    
+    volumes:
+      - redis-data:/data
+    
+    ports:
+      - "6379:6379"
+    
+    networks:
+      - legalclaw-net
+    
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    
+    labels:
+      - "com.legalclaw.description=Redis Cache"
+      - "com.legalclaw.service=cache"
+
+  # ==========================================
+  # Nginx Reverse Proxy (Opcional)
+  # ==========================================
+  nginx:
+    image: nginx:alpine
+    container_name: legalclaw-nginx
+    restart: unless-stopped
+    
+    ports:
+      - "80:80"
+      - "443:443"
+    
+    volumes:
+      - /var/data/legalclaw/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - /var/data/legalclaw/nginx/ssl:/etc/nginx/ssl:ro
+    
+    depends_on:
+      - legalclaw
+    
+    networks:
+      - legalclaw-net
+    
+    labels:
+      - "com.legalclaw.description=Nginx Reverse Proxy"
+      - "com.legalclaw.service=proxy"
+
+# ==========================================
+# Volumes Persistentes
+# ==========================================
+volumes:
+  postgres-data:
+    driver: local
+    labels:
+      - "com.legalclaw.description=PostgreSQL Data"
+  
+  redis-data:
+    driver: local
+    labels:
+      - "com.legalclaw.description=Redis Data"
+
+# ==========================================
+# Network
+# ==========================================
+networks:
+  legalclaw-net:
+    driver: bridge
+    labels:
+      - "com.legalclaw.description=LegalClaw Network"
