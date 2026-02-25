@@ -4,11 +4,17 @@ module.exports = {
   port: parseInt(process.env.PORT || '3000'),
   nodeEnv: process.env.NODE_ENV || 'development',
 
-  // Anthropic Claude
-  anthropic: {
-    apiKey: process.env.ANTHROPIC_API_KEY,
-    model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514',
-    maxTokens: parseInt(process.env.ANTHROPIC_MAX_TOKENS || '4096'),
+  // IA (multi-provider)
+  ai: {
+    provider: process.env.AI_PROVIDER || 'gemini', // 'gemini' ou 'anthropic'
+    // Gemini
+    geminiApiKey: process.env.GEMINI_API_KEY || '',
+    geminiModel: process.env.GEMINI_MODEL || 'gemini-2.0-flash',
+    // Anthropic
+    anthropicApiKey: process.env.ANTHROPIC_API_KEY || '',
+    anthropicModel: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514',
+    // Geral
+    maxTokens: parseInt(process.env.AI_MAX_TOKENS || '4096'),
   },
 
   // PostgreSQL

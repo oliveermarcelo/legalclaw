@@ -1,91 +1,85 @@
 ###############################################
-# DrLex - Stack para Portainer
-# Rede da Evolution API: wapify
-# Evolution URL: https://api.wapify.com.br
+# DrLex - Stack para Portainer (Docker Swarm)
+# Rede: wapify (overlay)
+# Traefik: v3.4 (traefik_traefik)
+# Dominio: drlex.wapify.com.br
 ###############################################
 
 version: '3.8'
 
 services:
-  drlex-api:
+  drlex_api:
     image: node:18-alpine
-    container_name: drlex-api
-    restart: unless-stopped
     working_dir: /app
     command: sh -c "npm ci --omit=dev 2>/dev/null || npm install --omit=dev && node src/index.js"
-    ports:
-      - "3000:3000"
     volumes:
       - /var/data/drlex/app:/app
     environment:
       - NODE_ENV=production
       - PORT=3000
+      - AI_PROVIDER=${AI_PROVIDER:-gemini}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.0-flash}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-sonnet-4-20250514}
-      - DATABASE_URL=postgresql://drlex:${DB_PASSWORD:-drlex_secret}@drlex-postgres:5432/drlex
-      - REDIS_URL=redis://drlex-redis:6379
+      - DATABASE_URL=postgresql://drlex:${DB_PASSWORD:-drlex_secret}@drlex_postgres:5432/drlex
+      - REDIS_URL=redis://drlex_redis:6379
       - EVOLUTION_API_URL=${EVOLUTION_API_URL:-https://api.wapify.com.br}
       - EVOLUTION_API_KEY=${EVOLUTION_API_KEY}
       - EVOLUTION_INSTANCE=${EVOLUTION_INSTANCE:-drlex}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - JWT_SECRET=${JWT_SECRET}
-    depends_on:
-      drlex-postgres:
-        condition: service_healthy
-      drlex-redis:
-        condition: service_started
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
-      interval: 30s
-      timeout: 10s
-      start_period: 30s
-      retries: 3
     networks:
-      - drlex-net
-      - evolution-net
+      - wapify
+      - drlex_internal
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.drlex.rule=Host(`drlex.wapify.com.br`)"
+        - "traefik.http.routers.drlex.entrypoints=websecure"
+        - "traefik.http.routers.drlex.tls=true"
+        - "traefik.http.routers.drlex.tls.certresolver=letsencryptresolver"
+        - "traefik.http.services.drlex.loadbalancer.server.port=3000"
 
-  drlex-postgres:
+  drlex_postgres:
     image: postgres:15-alpine
-    container_name: drlex-postgres
-    restart: unless-stopped
     environment:
       POSTGRES_DB: drlex
       POSTGRES_USER: drlex
       POSTGRES_PASSWORD: ${DB_PASSWORD:-drlex_secret}
     volumes:
-      - drlex-pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U drlex"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      - drlex_pgdata:/var/lib/postgresql/data
     networks:
-      - drlex-net
+      - drlex_internal
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
 
-  drlex-redis:
+  drlex_redis:
     image: redis:7-alpine
-    container_name: drlex-redis
-    restart: unless-stopped
     command: redis-server --appendonly yes
     volumes:
-      - drlex-redisdata:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
+      - drlex_redisdata:/data
     networks:
-      - drlex-net
+      - drlex_internal
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
 
 volumes:
-  drlex-pgdata:
+  drlex_pgdata:
     driver: local
-  drlex-redisdata:
+  drlex_redisdata:
     driver: local
 
 networks:
-  drlex-net:
-    driver: bridge
-  evolution-net:
+  wapify:
     external: true
-    name: wapify
+  drlex_internal:
+    driver: overlay
