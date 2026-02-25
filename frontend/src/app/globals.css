@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Serif+Display&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@layer base {
+  body {
+    @apply font-body text-surface-900 bg-surface-50 antialiased;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-brand-700 hover:bg-brand-800 text-white font-semibold px-6 py-3 rounded-xl
+    transition-all duration-200 shadow-lg shadow-brand-700/20 hover:shadow-brand-800/30
+    active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply bg-white hover:bg-surface-100 text-surface-800 font-medium px-6 py-3 rounded-xl
+    border border-surface-200 transition-all duration-200
+    active:scale-[0.98];
+  }
+
+  .input-field {
+    @apply w-full px-4 py-3 rounded-xl border border-surface-200 bg-white
+    focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500
+    placeholder:text-surface-300 transition-all duration-200;
+  }
+
+  .card {
+    @apply bg-white rounded-2xl border border-surface-200/60 shadow-sm
+    hover:shadow-md transition-shadow duration-300;
+  }
+
+  .sidebar-link {
+    @apply flex items-center gap-3 px-4 py-3 rounded-xl text-surface-300
+    hover:bg-white/5 hover:text-white transition-all duration-200 text-sm font-medium;
+  }
+
+  .sidebar-link-active {
+    @apply bg-brand-700/20 text-brand-300 hover:bg-brand-700/30;
+  }
+
+  .stat-card {
+    @apply card p-6 flex flex-col gap-2;
+  }
+
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold;
+  }
+
+  .badge-critical { @apply bg-red-100 text-red-700; }
+  .badge-high { @apply bg-orange-100 text-orange-700; }
+  .badge-medium { @apply bg-yellow-100 text-yellow-700; }
+  .badge-low { @apply bg-green-100 text-green-700; }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d1d5e0; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #91a7ff; }
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-16px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+.animate-slide-in {
+  animation: slideInLeft 0.3s ease-out forwards;
+}

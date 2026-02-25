@@ -7,6 +7,8 @@ const cron = require('node-cron');
 const config = require('./config');
 const logger = require('./utils/logger');
 const { pool, migrate } = require('./config/migrate');
+const { authOptional, authRequired } = require('./utils/auth-middleware');
+const authRoutes = require('./routes/auth');
 const apiRoutes = require('./routes/api');
 const webhookRoutes = require('./routes/webhooks');
 const evolution = require('./integrations/evolution');
@@ -16,20 +18,32 @@ const diarioMonitor = require('./services/diario-monitor');
 
 const app = express();
 
+// Trust proxy (Traefik)
+app.set('trust proxy', true);
+
 // ============================================================
 // MIDDLEWARE
 // ============================================================
 
-app.use(helmet());
-app.use(cors());
+app.use(helmet({ contentSecurityPolicy: false }));
+app.use(cors({
+  origin: [
+    'https://drlex.wapify.com.br',
+    'https://app.drlex.wapify.com.br',
+    'http://localhost:3001',
+    'http://localhost:3000',
+  ],
+  credentials: true,
+}));
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Rate limiting
+// Rate limiting (exceto webhooks)
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 min
+  windowMs: 15 * 60 * 1000,
   max: 100,
   message: { error: 'Muitas requisições, tente novamente em 15 minutos' },
+  validate: { xForwardedForHeader: false },
 });
 app.use('/api/', limiter);
 
@@ -48,23 +62,18 @@ app.use((req, res, next) => {
 // Health check
 app.get('/health', async (req, res) => {
   const checks = { api: 'ok' };
-
-  // PostgreSQL
   try {
     await pool.query('SELECT 1');
     checks.database = 'ok';
   } catch {
     checks.database = 'error';
   }
-
-  // Evolution API (WhatsApp)
   try {
     const status = await evolution.getConnectionStatus();
     checks.whatsapp = status?.state || status?.instance?.state || 'unknown';
   } catch {
     checks.whatsapp = 'unreachable';
   }
-
   const allOk = checks.database === 'ok';
   res.status(allOk ? 200 : 503).json({
     status: allOk ? 'ok' : 'degraded',
@@ -73,10 +82,13 @@ app.get('/health', async (req, res) => {
   });
 });
 
-// API REST
-app.use('/api', apiRoutes);
+// Auth (público)
+app.use('/api/auth', authOptional, authRoutes);
 
-// Webhooks
+// API (autenticado)
+app.use('/api', authRequired, apiRoutes);
+
+// Webhooks (sem auth - Evolution/Telegram chamam diretamente)
 app.use('/webhooks', webhookRoutes);
 
 // 404
@@ -94,7 +106,6 @@ app.use((err, req, res, next) => {
 // CRON JOBS
 // ============================================================
 
-// Verificar prazos vencendo (diariamente às 8h)
 cron.schedule('0 8 * * *', async () => {
   logger.info('Cron: Verificando prazos próximos...');
   try {
@@ -105,7 +116,6 @@ cron.schedule('0 8 * * *', async () => {
         `📋 ${deadline.description}\n` +
         `📆 Vencimento: ${new Date(deadline.deadline_date).toLocaleDateString('pt-BR')}\n` +
         `📁 Processo: ${deadline.process_number || 'N/A'}`;
-
       if (deadline.whatsapp) {
         try { await evolution.sendText(deadline.whatsapp, msg); } catch {}
       }
@@ -120,7 +130,6 @@ cron.schedule('0 8 * * *', async () => {
   }
 });
 
-// Varrer diários oficiais (diariamente às 7h)
 cron.schedule('0 7 * * 1-5', async () => {
   logger.info('Cron: Varrendo diários oficiais...');
   try {
@@ -131,7 +140,6 @@ cron.schedule('0 7 * * 1-5', async () => {
         `🔍 Palavra-chave: "${alert.matched_keyword}"\n` +
         `📄 ${alert.excerpt?.substring(0, 200)}\n` +
         `🔗 ${alert.url}`;
-
       if (alert.whatsapp) {
         try { await evolution.sendText(alert.whatsapp, msg); } catch {}
       }
@@ -152,33 +160,26 @@ cron.schedule('0 7 * * 1-5', async () => {
 
 async function start() {
   try {
-    // 1. Migrar banco de dados
     logger.info('Migrando banco de dados...');
     await migrate();
 
-    // 2. Inicializar Evolution API (criar instância se necessário)
     if (config.evolution.apiKey) {
       logger.info('Configurando Evolution API...');
       try {
-        const webhookUrl = `http://drlex-api:${config.port}/webhooks/evolution`;
-        await evolution.createInstance(webhookUrl);
+        await evolution.createInstance();
         const status = await evolution.getConnectionStatus();
         logger.info('Evolution API status:', status?.state || 'configurada');
       } catch (err) {
         logger.warn('Evolution API não disponível (configurar depois):', err.message);
       }
-    } else {
-      logger.warn('Evolution API: API Key não configurada');
     }
 
-    // 3. Inicializar Telegram Bot
     if (config.telegram.botToken) {
       telegram.init();
     } else {
       logger.warn('Telegram: Bot token não configurado');
     }
 
-    // 4. Iniciar servidor
     app.listen(config.port, '0.0.0.0', () => {
       logger.info(`🚀 Dr. Lex rodando na porta ${config.port}`);
       logger.info(`📋 Health: http://localhost:${config.port}/health`);
