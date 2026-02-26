@@ -34,6 +34,7 @@ services:
         delay: 10s
       labels:
         - "traefik.enable=true"
+        - "traefik.docker.network=wapify"
         - "traefik.http.routers.drlex-api.rule=Host(`drlex.wapify.com.br`) && (PathPrefix(`/api`) || PathPrefix(`/health`) || PathPrefix(`/webhooks`))"
         - "traefik.http.routers.drlex-api.entrypoints=websecure"
         - "traefik.http.routers.drlex-api.service=drlex-api"
@@ -62,6 +63,7 @@ services:
         delay: 15s
       labels:
         - "traefik.enable=true"
+        - "traefik.docker.network=wapify"
         - "traefik.http.routers.drlex-front.rule=Host(`drlex.wapify.com.br`)"
         - "traefik.http.routers.drlex-front.entrypoints=websecure"
         - "traefik.http.routers.drlex-front.service=drlex-front"
