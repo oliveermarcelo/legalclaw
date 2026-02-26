@@ -2,12 +2,19 @@ const axios = require('axios');
 const config = require('../config');
 const logger = require('../utils/logger');
 
+const defaultHeaders = {
+  'Content-Type': 'application/json',
+};
+
+if (config.evolution.apiKey) {
+  defaultHeaders.apikey = config.evolution.apiKey;
+  defaultHeaders['x-api-key'] = config.evolution.apiKey;
+  defaultHeaders.Authorization = `Bearer ${config.evolution.apiKey}`;
+}
+
 const api = axios.create({
   baseURL: config.evolution.apiUrl,
-  headers: {
-    apikey: config.evolution.apiKey,
-    'Content-Type': 'application/json',
-  },
+  headers: defaultHeaders,
   timeout: 30000,
 });
 
