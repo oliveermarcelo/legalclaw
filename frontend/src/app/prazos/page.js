@@ -77,6 +77,13 @@ export default function PrazosPage() {
     return diff;
   }
 
+  function formatDateSafe(dateValue, options, fallback = 'Data invalida') {
+    if (!dateValue) return fallback;
+    const parsed = new Date(dateValue);
+    if (Number.isNaN(parsed.getTime())) return fallback;
+    return parsed.toLocaleDateString('pt-BR', options);
+  }
+
   function urgencyBadge(date) {
     const days = daysUntil(date);
     if (days < 0) return <span className="badge badge-critical">Vencido</span>;
@@ -85,6 +92,9 @@ export default function PrazosPage() {
     if (days <= 10) return <span className="badge badge-medium">{days}d restantes</span>;
     return <span className="badge badge-low">{days}d restantes</span>;
   }
+
+  const calculatedDate =
+    calcResult?.deadlineDate || calcResult?.deadline_date || calcResult?.vencimento || null;
 
   return (
     <div className="animate-fade-in">
@@ -152,7 +162,11 @@ export default function PrazosPage() {
                 <div className="bg-brand-50 border border-brand-200 rounded-xl p-4">
                   <p className="text-sm text-brand-700 font-medium">Data final do prazo:</p>
                   <p className="text-2xl font-bold text-brand-900 mt-1">
-                    {new Date(calcResult.deadlineDate || calcResult.deadline_date).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
+                    {formatDateSafe(
+                      calculatedDate,
+                      { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' },
+                      calcResult.vencimentoFormatado || 'Data invalida'
+                    )}
                   </p>
                 </div>
                 {calcResult.details && (

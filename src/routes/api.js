@@ -7,6 +7,13 @@ const logger = require('../utils/logger');
 
 const router = express.Router();
 
+function normalizarDataISO(data) {
+  if (!data) return null;
+  const parsed = new Date(data);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toISOString().split('T')[0];
+}
+
 // ============================================================
 // CONTRATOS
 // ============================================================
@@ -52,24 +59,58 @@ router.get('/contracts/:userId', async (req, res) => {
  */
 router.post('/deadlines', async (req, res) => {
   try {
-    const { userId, processNumber, description, deadlineDate, deadlineType, diasUteis } = req.body;
-    if (!userId || !description || !deadlineDate) {
-      return res.status(400).json({ error: 'userId, description e deadlineDate são obrigatórios' });
-    }
-    const deadline = await deadlineManager.create(userId, {
+    const {
+      userId,
       processNumber,
       description,
       deadlineDate,
       deadlineType,
       diasUteis,
+      startDate,
+      dataInicial,
+      dias,
+    } = req.body;
+
+    if (!userId || !description) {
+      return res.status(400).json({ error: 'userId e description sao obrigatorios' });
+    }
+
+    let resolvedDeadlineDate = normalizarDataISO(deadlineDate);
+
+    // Compatibilidade com payload do frontend (startDate + dias).
+    if (!resolvedDeadlineDate && (startDate || dataInicial) && dias !== undefined) {
+      const dataBaseISO = normalizarDataISO(startDate || dataInicial);
+      const diasNumero = parseInt(dias, 10);
+
+      if (!dataBaseISO || !Number.isInteger(diasNumero) || diasNumero < 1) {
+        return res.status(400).json({ error: 'startDate/dataInicial invalido ou dias invalido' });
+      }
+
+      const dataCalculada = diasUteis !== false
+        ? deadlineManager.calcularPrazo(new Date(dataBaseISO), diasNumero)
+        : deadlineManager.calcularPrazoCorridos(new Date(dataBaseISO), diasNumero);
+
+      resolvedDeadlineDate = normalizarDataISO(dataCalculada);
+    }
+
+    if (!resolvedDeadlineDate) {
+      return res.status(400).json({ error: 'deadlineDate ou startDate/dataInicial + dias sao obrigatorios' });
+    }
+
+    const deadline = await deadlineManager.create(userId, {
+      processNumber,
+      description,
+      deadlineDate: resolvedDeadlineDate,
+      deadlineType,
+      diasUteis,
     });
+
     res.json({ success: true, data: deadline });
   } catch (err) {
     logger.error('Erro ao criar prazo:', err.message);
     res.status(500).json({ error: 'Erro ao criar prazo' });
   }
 });
-
 /**
  * GET /api/deadlines/:userId
  * Lista prazos ativos
@@ -89,21 +130,35 @@ router.get('/deadlines/:userId', async (req, res) => {
  */
 router.post('/deadlines/calculate', (req, res) => {
   try {
-    const { dataInicial, diasUteis, dias } = req.body;
-    if (!dataInicial || !dias) {
-      return res.status(400).json({ error: 'dataInicial e dias são obrigatórios' });
+    const { diasUteis } = req.body;
+    const dataInicial = req.body.dataInicial || req.body.startDate;
+    const dias = parseInt(req.body.dias, 10);
+
+    if (!dataInicial || !Number.isInteger(dias) || dias < 1) {
+      return res.status(400).json({ error: 'dataInicial/startDate e dias sao obrigatorios' });
     }
+
+    const dataInicialISO = normalizarDataISO(dataInicial);
+    if (!dataInicialISO) {
+      return res.status(400).json({ error: 'Data inicial invalida' });
+    }
+
     const data = diasUteis !== false
-      ? deadlineManager.calcularPrazo(new Date(dataInicial), dias)
-      : deadlineManager.calcularPrazoCorridos(new Date(dataInicial), dias);
+      ? deadlineManager.calcularPrazo(new Date(dataInicialISO), dias)
+      : deadlineManager.calcularPrazoCorridos(new Date(dataInicialISO), dias);
+
+    const vencimento = normalizarDataISO(data);
 
     res.json({
       success: true,
       data: {
-        dataInicial,
+        dataInicial: dataInicialISO,
+        startDate: dataInicialISO,
         dias,
         diasUteis: diasUteis !== false,
-        vencimento: data.toISOString().split('T')[0],
+        vencimento,
+        deadlineDate: vencimento,
+        deadline_date: vencimento,
         vencimentoFormatado: data.toLocaleDateString('pt-BR'),
       },
     });
@@ -111,7 +166,6 @@ router.post('/deadlines/calculate', (req, res) => {
     res.status(500).json({ error: 'Erro ao calcular prazo' });
   }
 });
-
 /**
  * GET /api/deadlines/tipos/cpc
  * Lista prazos padrão do CPC

@@ -122,16 +122,49 @@ export async function getDeadlines() {
 }
 
 export async function calculateDeadline(params) {
+  const payload = {
+    dataInicial: params?.dataInicial || params?.startDate,
+    startDate: params?.startDate || params?.dataInicial,
+    dias: Number(params?.dias),
+    diasUteis: params?.diasUteis,
+  };
+
   const data = await request('/api/deadlines/calculate', {
     method: 'POST',
-    body: JSON.stringify(params),
+    body: JSON.stringify(payload),
   });
-  return data.data || data;
+
+  const raw = data.data || data;
+  const deadlineDate = raw.deadlineDate || raw.deadline_date || raw.vencimento || null;
+
+  return {
+    ...raw,
+    deadlineDate,
+    deadline_date: deadlineDate,
+  };
 }
 
 export async function getCPCDeadlines() {
   const data = await request('/api/deadlines/tipos/cpc');
-  return data.data || [];
+  const raw = data.data || [];
+
+  if (Array.isArray(raw)) return raw;
+  if (!raw || typeof raw !== 'object') return [];
+
+  return Object.entries(raw).map(([codigo, prazo]) => {
+    const nome = codigo
+      .split('_')
+      .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+      .join(' ');
+
+    return {
+      codigo,
+      nome,
+      dias: prazo?.dias ?? 0,
+      diasUteis: prazo?.diasUteis ?? prazo?.uteis ?? true,
+      lei: prazo?.lei,
+    };
+  });
 }
 
 // Diários
