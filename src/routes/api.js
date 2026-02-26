@@ -253,7 +253,7 @@ router.get('/diarios/monitors/:userId', async (req, res) => {
  */
 router.post('/diarios/search', async (req, res) => {
   try {
-    const { keyword } = req.body;
+    const keyword = req.body.keyword || req.body.query || req.body.term;
     if (!keyword) return res.status(400).json({ error: 'keyword é obrigatório' });
     const results = await diarioMonitor.searchDOU(keyword);
     res.json({ success: true, data: results });
@@ -283,3 +283,4 @@ router.post('/chat', async (req, res) => {
 });
 
 module.exports = router;
+
