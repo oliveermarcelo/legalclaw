@@ -43,12 +43,28 @@ export default function RegisterPage() {
             <h1 className="font-display text-3xl text-white">Dr. Lex</h1>
           </div>
           <p className="text-surface-300 text-lg leading-relaxed mb-6">
-            Comece a usar o assistente jurídico mais inteligente do Brasil.
+            Comece a usar o assistente juridico mais inteligente do Brasil.
           </p>
-          <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10">
-            <p className="text-accent-400 font-semibold text-sm mb-2">✨ Plano Solo</p>
-            <p className="text-white text-2xl font-display mb-1">R$ 197<span className="text-surface-300 text-sm font-body">/mês</span></p>
-            <p className="text-surface-300 text-sm">50 contratos · Diário Oficial · Prazos CPC</p>
+
+          <div className="rounded-2xl p-6 border border-white/30 bg-white/95 shadow-xl shadow-black/20">
+            <p className="text-brand-700 font-semibold text-sm mb-2">Plano Solo</p>
+            <p className="text-accent-600 text-3xl font-display mb-4">
+              R$ 197<span className="text-surface-800 text-sm font-body ml-1">/mes</span>
+            </p>
+            <ul className="space-y-2 text-sm text-surface-800">
+              {[
+                'Analise ilimitada de contratos',
+                'Calculo de prazos CPC',
+                'Monitoramento de diarios',
+                'Alertas via WhatsApp',
+                'Chat com IA juridica',
+              ].map((item) => (
+                <li key={item} className="flex items-center gap-2">
+                  <span className="inline-block w-2 h-2 rounded-full bg-emerald-600" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
       </div>
@@ -64,7 +80,7 @@ export default function RegisterPage() {
           </div>
 
           <h2 className="font-display text-3xl text-surface-900 mb-2">Criar sua conta</h2>
-          <p className="text-surface-300 mb-8">Preencha seus dados para começar</p>
+          <p className="text-surface-300 mb-8">Preencha seus dados para comecar</p>
 
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-6 text-sm">{error}</div>
@@ -74,7 +90,7 @@ export default function RegisterPage() {
             <div>
               <label className="block text-sm font-medium text-surface-800 mb-2">Nome completo</label>
               <input type="text" value={form.name} onChange={(e) => update('name', e.target.value)}
-                className="input-field" placeholder="Dr. João Silva" required />
+                className="input-field" placeholder="Dr. Joao Silva" required />
             </div>
             <div>
               <label className="block text-sm font-medium text-surface-800 mb-2">Email</label>
@@ -89,7 +105,7 @@ export default function RegisterPage() {
             <div>
               <label className="block text-sm font-medium text-surface-800 mb-2">Senha</label>
               <input type="password" value={form.password} onChange={(e) => update('password', e.target.value)}
-                className="input-field" placeholder="Mínimo 6 caracteres" required />
+                className="input-field" placeholder="Minimo 6 caracteres" required />
             </div>
             <button type="submit" disabled={loading} className="btn-primary w-full">
               {loading ? 'Criando conta...' : 'Criar conta'}
@@ -97,7 +113,7 @@ export default function RegisterPage() {
           </form>
 
           <p className="text-center text-surface-300 text-sm mt-8">
-            Já tem conta?{' '}
+            Ja tem conta?{' '}
             <a href="/login" className="text-brand-600 hover:text-brand-700 font-semibold">Entrar</a>
           </p>
         </div>
