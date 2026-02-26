@@ -75,7 +75,11 @@ docker service logs --tail 30 "${STACK_NAME}_drlex_worker" | tail -n 10 || true
 
 if git -C "${APP_DIR}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   mkdir -p "${APP_DIR}/.deploy"
-  stable_commit="$(git -C "${APP_DIR}" rev-parse HEAD)"
+  if [[ -n "${DEPLOYED_COMMIT:-}" ]]; then
+    stable_commit="${DEPLOYED_COMMIT}"
+  else
+    stable_commit="$(git -C "${APP_DIR}" rev-parse HEAD)"
+  fi
   echo "${stable_commit}" > "${APP_DIR}/.deploy/last-stable-commit"
   echo "[ok] recorded stable commit: ${stable_commit}"
 fi

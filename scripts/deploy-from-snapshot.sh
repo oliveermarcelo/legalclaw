@@ -17,6 +17,7 @@ echo "[deploy] snapshot=${SNAPSHOT_DIR}"
 mkdir -p "${RELEASES_DIR}"
 git clone --depth 1 --branch "${BRANCH}" "${REPO_URL}" "${SNAPSHOT_DIR}"
 SNAPSHOT_COMMIT="$(git -C "${SNAPSHOT_DIR}" rev-parse --short HEAD)"
+SNAPSHOT_COMMIT_FULL="$(git -C "${SNAPSHOT_DIR}" rev-parse HEAD)"
 echo "[deploy] snapshot commit=${SNAPSHOT_COMMIT}"
 
 # Evita conflito de escrita em node_modules durante update.
@@ -54,7 +55,8 @@ docker service update --force --detach=false "${STACK_NAME}_drlex_frontend"
 
 if [[ -f "${APP_DIR}/scripts/post-deploy-check.sh" ]]; then
   echo "[deploy] running post-deploy check"
-  bash "${APP_DIR}/scripts/post-deploy-check.sh" "${STACK_NAME}" "https://drlex.wapify.com.br"
+  DEPLOYED_COMMIT="${SNAPSHOT_COMMIT_FULL}" \
+    bash "${APP_DIR}/scripts/post-deploy-check.sh" "${STACK_NAME}" "https://drlex.wapify.com.br"
 fi
 
 echo "[done] deploy completed from snapshot commit ${SNAPSHOT_COMMIT}"
