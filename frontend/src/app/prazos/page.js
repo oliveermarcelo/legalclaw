@@ -79,7 +79,17 @@ export default function PrazosPage() {
 
   function formatDateSafe(dateValue, options, fallback = 'Data invalida') {
     if (!dateValue) return fallback;
-    const parsed = new Date(dateValue);
+    let parsed = new Date(dateValue);
+
+    // Compatibilidade com retorno em formato pt-BR (dd/mm/yyyy).
+    if (Number.isNaN(parsed.getTime()) && typeof dateValue === 'string') {
+      const match = dateValue.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+      if (match) {
+        const [, dd, mm, yyyy] = match;
+        parsed = new Date(`${yyyy}-${mm}-${dd}T00:00:00`);
+      }
+    }
+
     if (Number.isNaN(parsed.getTime())) return fallback;
     return parsed.toLocaleDateString('pt-BR', options);
   }
