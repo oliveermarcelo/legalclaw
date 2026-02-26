@@ -54,6 +54,9 @@ router.post('/evolution', async (req, res) => {
 router.get('/evolution/status', async (req, res) => {
   try {
     const status = await evolution.getConnectionStatus();
+    if (status?.state === 'error') {
+      return res.status(502).json({ success: false, error: 'evolution_unreachable', data: status });
+    }
     res.json({ success: true, data: status });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao verificar status' });

@@ -104,7 +104,13 @@ app.get('/health', async (req, res) => {
       : `${aiProvider}:not_configured`;
 
   const whatsappCheck = withTimeout(evolution.getConnectionStatus(), HEALTHCHECK_TIMEOUT_MS)
-    .then((status) => status?.state || status?.instance?.state || 'unknown')
+    .then((status) => {
+      const state = status?.state || status?.instance?.state;
+      if (state === 'error' && status?.statusCode) {
+        return `error:${status.statusCode}`;
+      }
+      return state || 'unknown';
+    })
     .catch(() => 'unreachable');
 
   const [databaseStatus, redisStatus, whatsappStatus] = await Promise.all([

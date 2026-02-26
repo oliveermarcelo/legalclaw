@@ -72,8 +72,17 @@ async function getConnectionStatus() {
     const response = await api.get(`/instance/connectionState/${INSTANCE}`);
     return response.data;
   } catch (err) {
-    logger.error('Erro ao verificar status:', err.message);
-    return { state: 'unknown' };
+    const statusCode = err.response?.status || 0;
+    const details = err.response?.data?.message || err.response?.data || err.message;
+    logger.error('Erro ao verificar status Evolution:', {
+      statusCode,
+      details,
+    });
+    return {
+      state: 'error',
+      statusCode,
+      details,
+    };
   }
 }
 
