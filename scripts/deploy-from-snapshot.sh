@@ -46,6 +46,14 @@ echo "[deploy] rebuilding frontend artifacts"
 rm -rf "${FRONTEND_DIR}/node_modules" "${FRONTEND_DIR}/.next"
 docker run --rm -v "${FRONTEND_DIR}:/app" -w /app node:18-alpine sh -lc "npm install --include=dev && npm run build"
 
+if [[ -f "${APP_DIR}/.env" ]]; then
+  echo "[deploy] loading env from ${APP_DIR}/.env"
+  set -a
+  # shellcheck disable=SC1090
+  source "${APP_DIR}/.env"
+  set +a
+fi
+
 echo "[deploy] deploying stack"
 docker stack deploy -c "${APP_DIR}/portainer-stack.yml" "${STACK_NAME}"
 docker service scale "${STACK_NAME}_drlex_frontend=1"

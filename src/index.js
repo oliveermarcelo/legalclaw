@@ -92,11 +92,16 @@ app.get('/health', async (req, res) => {
     }
   })();
 
-  const aiProvider = config.ai.provider;
+  const aiProvider = (config.ai.provider || '').toLowerCase();
+  const aiSupported = aiProvider === 'anthropic' || aiProvider === 'gemini';
   const aiConfigured =
     (aiProvider === 'anthropic' && Boolean(config.ai.anthropicApiKey)) ||
     (aiProvider === 'gemini' && Boolean(config.ai.geminiApiKey));
-  checks.ai = aiConfigured ? `${aiProvider}:configured` : `${aiProvider}:not_configured`;
+  checks.ai = !aiSupported
+    ? `${aiProvider || 'unknown'}:unsupported`
+    : aiConfigured
+      ? `${aiProvider}:configured`
+      : `${aiProvider}:not_configured`;
 
   const whatsappCheck = withTimeout(evolution.getConnectionStatus(), HEALTHCHECK_TIMEOUT_MS)
     .then((status) => status?.state || status?.instance?.state || 'unknown')

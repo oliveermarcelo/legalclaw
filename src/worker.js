@@ -112,7 +112,10 @@ function registerCronJobs() {
 async function setupIntegrations() {
   if (config.evolution.apiKey) {
     try {
-      await evolution.createInstance();
+      await evolution.createInstance(config.evolution.webhookUrl || undefined);
+      if (config.evolution.webhookUrl) {
+        await evolution.setWebhook(config.evolution.webhookUrl);
+      }
       const status = await evolution.getConnectionStatus();
       logger.info(`Worker: Evolution status ${status?.state || 'unknown'}`);
     } catch (err) {

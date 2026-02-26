@@ -58,6 +58,14 @@ rsync -a --delete --exclude node_modules --exclude .next "${APP_DIR}/frontend/" 
 rm -rf "${FRONTEND_SYNC_DIR}/node_modules" "${FRONTEND_SYNC_DIR}/.next"
 docker run --rm -v "${FRONTEND_SYNC_DIR}:/app" -w /app node:18-alpine sh -lc "npm install --include=dev && npm run build"
 
+if [[ -f "${APP_DIR}/.env" ]]; then
+  echo "[rollback] loading env from ${APP_DIR}/.env"
+  set -a
+  # shellcheck disable=SC1090
+  source "${APP_DIR}/.env"
+  set +a
+fi
+
 echo "[rollback] deploying stack"
 docker stack deploy -c "${APP_DIR}/portainer-stack.yml" "${STACK_NAME}"
 docker service scale "${STACK_NAME}_drlex_frontend=1"

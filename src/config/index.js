@@ -6,7 +6,7 @@ module.exports = {
 
   // IA (multi-provider)
   ai: {
-    provider: process.env.AI_PROVIDER || 'gemini', // 'gemini' ou 'anthropic'
+    provider: process.env.AI_PROVIDER || 'anthropic', // 'anthropic' ou 'gemini'
     // Gemini
     geminiApiKey: process.env.GEMINI_API_KEY || '',
     geminiModel: process.env.GEMINI_MODEL || 'gemini-2.0-flash',
@@ -32,6 +32,7 @@ module.exports = {
     apiUrl: process.env.EVOLUTION_API_URL || 'https://api.wapify.com.br',
     apiKey: process.env.EVOLUTION_API_KEY || '',
     instance: process.env.EVOLUTION_INSTANCE || 'drlex',
+    webhookUrl: process.env.EVOLUTION_WEBHOOK_URL || '',
   },
 
   // Telegram
