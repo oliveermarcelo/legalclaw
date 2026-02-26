@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { Scale } from 'lucide-react';
 import { register } from '@/lib/api';
 
 export default function RegisterPage() {
@@ -45,7 +46,7 @@ export default function RegisterPage() {
         <div className="relative z-10 max-w-md px-12">
           <div className="flex items-center gap-3 mb-8">
             <div className="w-12 h-12 bg-brand-600 rounded-xl flex items-center justify-center">
-              <span className="text-white font-display text-xl">⚖</span>
+              <Scale className="h-5 w-5 text-white" strokeWidth={2.2} />
             </div>
             <h1 className="font-display text-3xl text-white">Dr. Lex</h1>
           </div>
@@ -84,7 +85,7 @@ export default function RegisterPage() {
         <div className="w-full max-w-md animate-fade-in">
           <div className="lg:hidden flex items-center gap-3 mb-10">
             <div className="w-10 h-10 bg-brand-600 rounded-xl flex items-center justify-center">
-              <span className="text-white font-display text-lg">⚖</span>
+              <Scale className="h-4 w-4 text-white" strokeWidth={2.2} />
             </div>
             <h1 className="font-display text-2xl text-surface-900">Dr. Lex</h1>
           </div>
@@ -131,3 +132,4 @@ export default function RegisterPage() {
     </div>
   );
 }
+
