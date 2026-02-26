@@ -3,6 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const cron = require('node-cron');
+const Redis = require('ioredis');
 
 const config = require('./config');
 const logger = require('./utils/logger');
@@ -62,19 +63,48 @@ app.use((req, res, next) => {
 // Health check
 app.get('/health', async (req, res) => {
   const checks = { api: 'ok' };
+
+  // Banco
   try {
     await pool.query('SELECT 1');
     checks.database = 'ok';
   } catch {
     checks.database = 'error';
   }
+
+  // Redis
+  let redisClient = null;
+  try {
+    redisClient = new Redis(config.redis.url, {
+      lazyConnect: true,
+      connectTimeout: 2000,
+      maxRetriesPerRequest: 1,
+      enableOfflineQueue: false,
+    });
+    const pong = await redisClient.ping();
+    checks.redis = pong === 'PONG' ? 'ok' : 'error';
+  } catch {
+    checks.redis = 'error';
+  } finally {
+    if (redisClient) redisClient.disconnect();
+  }
+
+  // IA configurada
+  const aiProvider = config.ai.provider;
+  const aiConfigured =
+    (aiProvider === 'anthropic' && Boolean(config.ai.anthropicApiKey)) ||
+    (aiProvider === 'gemini' && Boolean(config.ai.geminiApiKey));
+  checks.ai = aiConfigured ? `${aiProvider}:configured` : `${aiProvider}:not_configured`;
+
+  // Integracao WhatsApp
   try {
     const status = await evolution.getConnectionStatus();
     checks.whatsapp = status?.state || status?.instance?.state || 'unknown';
   } catch {
     checks.whatsapp = 'unreachable';
   }
-  const allOk = checks.database === 'ok';
+
+  const allOk = checks.database === 'ok' && checks.redis === 'ok';
   res.status(allOk ? 200 : 503).json({
     status: allOk ? 'ok' : 'degraded',
     timestamp: new Date().toISOString(),
