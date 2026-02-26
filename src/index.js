@@ -14,6 +14,14 @@ const webhookRoutes = require('./routes/webhooks');
 const evolution = require('./integrations/evolution');
 
 const app = express();
+const HEALTHCHECK_TIMEOUT_MS = Number(process.env.HEALTHCHECK_TIMEOUT_MS || 1500);
+
+function withTimeout(promise, timeoutMs) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), timeoutMs)),
+  ]);
+}
 
 app.set('trust proxy', true);
 
@@ -41,37 +49,44 @@ const limiter = rateLimit({
 app.use('/api/', limiter);
 
 app.use((req, res, next) => {
-  if (req.path !== '/health') {
+  if (!req.path.startsWith('/health')) {
     logger.debug(`${req.method} ${req.path}`);
   }
   next();
 });
 
+app.get('/health/live', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime_seconds: Math.floor(process.uptime()),
+  });
+});
+
 app.get('/health', async (req, res) => {
   const checks = { api: 'ok' };
 
-  try {
-    await pool.query('SELECT 1');
-    checks.database = 'ok';
-  } catch {
-    checks.database = 'error';
-  }
+  const dbCheck = withTimeout(pool.query('SELECT 1'), HEALTHCHECK_TIMEOUT_MS)
+    .then(() => 'ok')
+    .catch(() => 'error');
 
-  let redisClient = null;
-  try {
-    redisClient = new Redis(config.redis.url, {
-      lazyConnect: true,
-      connectTimeout: 2000,
-      maxRetriesPerRequest: 1,
-      enableOfflineQueue: false,
-    });
-    const pong = await redisClient.ping();
-    checks.redis = pong === 'PONG' ? 'ok' : 'error';
-  } catch {
-    checks.redis = 'error';
-  } finally {
-    if (redisClient) redisClient.disconnect();
-  }
+  const redisCheck = (async () => {
+    let redisClient = null;
+    try {
+      redisClient = new Redis(config.redis.url, {
+        lazyConnect: true,
+        connectTimeout: 2000,
+        maxRetriesPerRequest: 1,
+        enableOfflineQueue: false,
+      });
+      const pong = await withTimeout(redisClient.ping(), HEALTHCHECK_TIMEOUT_MS);
+      return pong === 'PONG' ? 'ok' : 'error';
+    } catch {
+      return 'error';
+    } finally {
+      if (redisClient) redisClient.disconnect();
+    }
+  })();
 
   const aiProvider = config.ai.provider;
   const aiConfigured =
@@ -79,16 +94,19 @@ app.get('/health', async (req, res) => {
     (aiProvider === 'gemini' && Boolean(config.ai.geminiApiKey));
   checks.ai = aiConfigured ? `${aiProvider}:configured` : `${aiProvider}:not_configured`;
 
-  // Nao bloquear o healthcheck por dependencia externa lenta.
-  try {
-    const status = await Promise.race([
-      evolution.getConnectionStatus(),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 1200)),
-    ]);
-    checks.whatsapp = status?.state || status?.instance?.state || 'unknown';
-  } catch {
-    checks.whatsapp = 'unreachable';
-  }
+  const whatsappCheck = withTimeout(evolution.getConnectionStatus(), HEALTHCHECK_TIMEOUT_MS)
+    .then((status) => status?.state || status?.instance?.state || 'unknown')
+    .catch(() => 'unreachable');
+
+  const [databaseStatus, redisStatus, whatsappStatus] = await Promise.all([
+    dbCheck,
+    redisCheck,
+    whatsappCheck,
+  ]);
+
+  checks.database = databaseStatus;
+  checks.redis = redisStatus;
+  checks.whatsapp = whatsappStatus;
 
   const allOk = checks.database === 'ok' && checks.redis === 'ok';
   res.status(allOk ? 200 : 503).json({
