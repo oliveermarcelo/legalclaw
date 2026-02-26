@@ -79,8 +79,12 @@ app.get('/health', async (req, res) => {
     (aiProvider === 'gemini' && Boolean(config.ai.geminiApiKey));
   checks.ai = aiConfigured ? `${aiProvider}:configured` : `${aiProvider}:not_configured`;
 
+  // Nao bloquear o healthcheck por dependencia externa lenta.
   try {
-    const status = await evolution.getConnectionStatus();
+    const status = await Promise.race([
+      evolution.getConnectionStatus(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 1200)),
+    ]);
     checks.whatsapp = status?.state || status?.instance?.state || 'unknown';
   } catch {
     checks.whatsapp = 'unreachable';
