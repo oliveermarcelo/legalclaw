@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { AlarmClock, FileText, Newspaper, Scale } from 'lucide-react';
 import { login } from '@/lib/api';
 
 export default function LoginPage() {
@@ -22,6 +23,12 @@ export default function LoginPage() {
     }
   }
 
+  const highlights = [
+    { icon: FileText, text: 'Análise de contratos em segundos' },
+    { icon: AlarmClock, text: 'Prazos processuais automatizados' },
+    { icon: Newspaper, text: 'Monitoramento de diários oficiais 24/7' },
+  ];
+
   return (
     <div className="min-h-screen flex">
       {/* Left - Brand */}
@@ -32,7 +39,7 @@ export default function LoginPage() {
         <div className="relative z-10 max-w-md px-12">
           <div className="flex items-center gap-3 mb-8">
             <div className="w-12 h-12 bg-brand-600 rounded-xl flex items-center justify-center">
-              <span className="text-white font-display text-xl">⚖</span>
+              <Scale className="h-5 w-5 text-white" strokeWidth={2.2} />
             </div>
             <h1 className="font-display text-3xl text-white">Dr. Lex</h1>
           </div>
@@ -40,16 +47,15 @@ export default function LoginPage() {
             Seu assistente jurídico com inteligência artificial. Análise de contratos, gestão de prazos e monitoramento de diários oficiais.
           </p>
           <div className="space-y-4">
-            {[
-              { icon: '📋', text: 'Análise de contratos em segundos' },
-              { icon: '⏰', text: 'Prazos processuais automatizados' },
-              { icon: '📰', text: 'Monitoramento de diários oficiais 24/7' },
-            ].map((item, i) => (
-              <div key={i} className="flex items-center gap-3 text-surface-200">
-                <span className="text-xl">{item.icon}</span>
-                <span className="text-sm">{item.text}</span>
-              </div>
-            ))}
+            {highlights.map((item, i) => {
+              const Icon = item.icon;
+              return (
+                <div key={i} className="flex items-center gap-3 text-surface-200">
+                  <Icon className="h-4 w-4 text-brand-300" strokeWidth={2.3} />
+                  <span className="text-sm">{item.text}</span>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -60,7 +66,7 @@ export default function LoginPage() {
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-3 mb-10">
             <div className="w-10 h-10 bg-brand-600 rounded-xl flex items-center justify-center">
-              <span className="text-white font-display text-lg">⚖</span>
+              <Scale className="h-4 w-4 text-white" strokeWidth={2.2} />
             </div>
             <h1 className="font-display text-2xl text-surface-900">Dr. Lex</h1>
           </div>
