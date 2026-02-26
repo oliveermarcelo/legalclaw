@@ -68,6 +68,38 @@ services:
         - "traefik.http.services.drlex-front.loadbalancer.server.port=3001"
         - "traefik.http.services.drlex-front.loadbalancer.passHostHeader=1"
 
+  drlex_worker:
+    image: node:18-alpine
+    working_dir: /app
+    command: sh -c "npm ci --omit=dev 2>/dev/null || npm install --omit=dev && node src/worker.js"
+    volumes:
+      - /var/data/drlex/app:/app
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - AI_PROVIDER=${AI_PROVIDER:-openai}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.0-flash}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-sonnet-4-20250514}
+      - DATABASE_URL=postgresql://drlex:${DB_PASSWORD:-drlex_secret}@drlex_postgres:5432/drlex
+      - REDIS_URL=redis://drlex_redis:6379
+      - EVOLUTION_API_URL=${EVOLUTION_API_URL:-https://api.wapify.com.br}
+      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY}
+      - EVOLUTION_INSTANCE=${EVOLUTION_INSTANCE:-drlex}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - JWT_SECRET=${JWT_SECRET}
+    networks:
+      - wapify
+      - drlex_internal
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+
   drlex_postgres:
     image: postgres:15-alpine
     environment:
