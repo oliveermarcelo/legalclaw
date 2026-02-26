@@ -2,23 +2,74 @@ const axios = require('axios');
 const config = require('../config');
 const logger = require('../utils/logger');
 
-const defaultHeaders = {
-  'Content-Type': 'application/json',
-};
-
-if (config.evolution.apiKey) {
-  defaultHeaders.apikey = config.evolution.apiKey;
-  defaultHeaders['x-api-key'] = config.evolution.apiKey;
-  defaultHeaders.Authorization = `Bearer ${config.evolution.apiKey}`;
-}
-
 const api = axios.create({
   baseURL: config.evolution.apiUrl,
-  headers: defaultHeaders,
+  headers: {
+    'Content-Type': 'application/json',
+  },
   timeout: 30000,
 });
 
 const INSTANCE = config.evolution.instance;
+const API_KEY = config.evolution.apiKey;
+
+function authStrategies() {
+  if (!API_KEY) return [{}];
+
+  return [
+    {
+      headers: {
+        apikey: API_KEY,
+        'x-api-key': API_KEY,
+        Authorization: `Bearer ${API_KEY}`,
+      },
+    },
+    {
+      headers: {
+        Authorization: API_KEY,
+      },
+    },
+    {
+      params: { apikey: API_KEY },
+    },
+    {
+      params: { token: API_KEY },
+    },
+  ];
+}
+
+async function evolutionRequest(method, url, { data, params } = {}) {
+  const strategies = authStrategies();
+  let lastAuthError = null;
+
+  for (const strategy of strategies) {
+    try {
+      return await api.request({
+        method,
+        url,
+        data,
+        headers: strategy.headers || undefined,
+        params: {
+          ...(params || {}),
+          ...(strategy.params || {}),
+        },
+      });
+    } catch (err) {
+      const statusCode = err.response?.status || 0;
+      const isAuthError = statusCode === 401 || statusCode === 403;
+
+      if (isAuthError) {
+        lastAuthError = err;
+        continue;
+      }
+
+      throw err;
+    }
+  }
+
+  if (lastAuthError) throw lastAuthError;
+  throw new Error('Evolution request failed without response');
+}
 
 // ============================================================
 // GESTÃO DE INSTÂNCIA
@@ -29,21 +80,23 @@ const INSTANCE = config.evolution.instance;
  */
 async function createInstance(webhookUrl) {
   try {
-    const response = await api.post('/instance/create', {
-      instanceName: INSTANCE,
-      integration: 'WHATSAPP-BAILEYS',
-      qrcode: true,
-      webhook: webhookUrl
-        ? {
-            url: webhookUrl,
-            webhook_by_events: true,
-            events: [
-              'messages.upsert',
-              'connection.update',
-              'messages.update',
-            ],
-          }
-        : undefined,
+    const response = await evolutionRequest('post', '/instance/create', {
+      data: {
+        instanceName: INSTANCE,
+        integration: 'WHATSAPP-BAILEYS',
+        qrcode: true,
+        webhook: webhookUrl
+          ? {
+              url: webhookUrl,
+              webhook_by_events: true,
+              events: [
+                'messages.upsert',
+                'connection.update',
+                'messages.update',
+              ],
+            }
+          : undefined,
+      },
     });
     logger.info('Instância Evolution criada:', INSTANCE);
     return response.data;
@@ -63,7 +116,7 @@ async function createInstance(webhookUrl) {
  */
 async function getQRCode() {
   try {
-    const response = await api.get(`/instance/connect/${INSTANCE}`);
+    const response = await evolutionRequest('get', `/instance/connect/${INSTANCE}`);
     return response.data;
   } catch (err) {
     logger.error('Erro ao obter QR Code:', err.message);
@@ -76,7 +129,7 @@ async function getQRCode() {
  */
 async function getConnectionStatus() {
   try {
-    const response = await api.get(`/instance/connectionState/${INSTANCE}`);
+    const response = await evolutionRequest('get', `/instance/connectionState/${INSTANCE}`);
     return response.data;
   } catch (err) {
     const statusCode = err.response?.status || 0;
@@ -98,14 +151,16 @@ async function getConnectionStatus() {
  */
 async function setWebhook(url) {
   try {
-    const response = await api.post(`/webhook/set/${INSTANCE}`, {
-      url,
-      webhook_by_events: true,
-      events: [
-        'messages.upsert',
-        'connection.update',
-        'messages.update',
-      ],
+    const response = await evolutionRequest('post', `/webhook/set/${INSTANCE}`, {
+      data: {
+        url,
+        webhook_by_events: true,
+        events: [
+          'messages.upsert',
+          'connection.update',
+          'messages.update',
+        ],
+      },
     });
     logger.info('Webhook configurado:', url);
     return response.data;
@@ -129,9 +184,11 @@ async function sendText(to, text) {
     // Garantir formato correto do número
     const number = to.replace(/\D/g, '');
 
-    const response = await api.post(`/message/sendText/${INSTANCE}`, {
-      number,
-      text,
+    const response = await evolutionRequest('post', `/message/sendText/${INSTANCE}`, {
+      data: {
+        number,
+        text,
+      },
     });
     logger.debug('Mensagem enviada via Evolution', { to: number });
     return response.data;
@@ -147,15 +204,17 @@ async function sendText(to, text) {
 async function sendButtons(to, title, description, buttons) {
   try {
     const number = to.replace(/\D/g, '');
-    const response = await api.post(`/message/sendButtons/${INSTANCE}`, {
-      number,
-      title,
-      description,
-      buttons: buttons.map((btn, i) => ({
-        buttonId: `btn_${i}`,
-        buttonText: { displayText: btn },
-        type: 1,
-      })),
+    const response = await evolutionRequest('post', `/message/sendButtons/${INSTANCE}`, {
+      data: {
+        number,
+        title,
+        description,
+        buttons: buttons.map((btn, i) => ({
+          buttonId: `btn_${i}`,
+          buttonText: { displayText: btn },
+          type: 1,
+        })),
+      },
     });
     return response.data;
   } catch (err) {
@@ -172,12 +231,14 @@ async function sendButtons(to, title, description, buttons) {
 async function sendList(to, title, description, buttonText, sections) {
   try {
     const number = to.replace(/\D/g, '');
-    const response = await api.post(`/message/sendList/${INSTANCE}`, {
-      number,
-      title,
-      description,
-      buttonText,
-      sections,
+    const response = await evolutionRequest('post', `/message/sendList/${INSTANCE}`, {
+      data: {
+        number,
+        title,
+        description,
+        buttonText,
+        sections,
+      },
     });
     return response.data;
   } catch (err) {
@@ -196,12 +257,14 @@ async function sendList(to, title, description, buttonText, sections) {
 async function sendDocument(to, url, fileName, caption = '') {
   try {
     const number = to.replace(/\D/g, '');
-    const response = await api.post(`/message/sendMedia/${INSTANCE}`, {
-      number,
-      mediatype: 'document',
-      media: url,
-      fileName,
-      caption,
+    const response = await evolutionRequest('post', `/message/sendMedia/${INSTANCE}`, {
+      data: {
+        number,
+        mediatype: 'document',
+        media: url,
+        fileName,
+        caption,
+      },
     });
     return response.data;
   } catch (err) {
