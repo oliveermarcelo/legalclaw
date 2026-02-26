@@ -212,6 +212,12 @@ export async function searchDiario(params) {
   return data.data || data;
 }
 
+// Features
+export async function getFeatures() {
+  const data = await request('/api/features');
+  return data.data || [];
+}
+
 // Chat
 export async function chat(message) {
   const data = await request('/api/chat', {

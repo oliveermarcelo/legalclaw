@@ -7,22 +7,71 @@ import {
   Clock3,
   FileText,
   Gavel,
+  LayoutDashboard,
   MessageSquareText,
   Newspaper,
   Search,
+  ShieldCheck,
   Sparkles,
 } from 'lucide-react';
-import { getMe, getUser } from '@/lib/api';
+import { getFeatures, getMe, getUser } from '@/lib/api';
+
+const FEATURE_FALLBACK = [
+  { id: 'contratos', title: 'Analise de Contratos', status: 'active', route: '/contratos' },
+  { id: 'diarios', title: 'Monitor de Diarios', status: 'active', route: '/diarios' },
+  { id: 'prazos', title: 'Gestao de Prazos', status: 'active', route: '/prazos' },
+  { id: 'whatsapp', title: 'WhatsApp Integrado', status: 'setup', route: null },
+  { id: 'telegram', title: 'Telegram Bot', status: 'setup', route: null },
+  { id: 'api_rest', title: 'API REST', status: 'active', route: null },
+  { id: 'privacidade', title: 'Privacidade Total', status: 'active', route: null },
+  { id: 'brasil_first', title: 'Brasil First', status: 'active', route: null },
+  { id: 'jurisprudencia', title: 'Jurisprudencia', status: 'soon', route: null },
+  { id: 'docs', title: 'Gerador de Docs', status: 'soon', route: null },
+  { id: 'dashboard_web', title: 'Dashboard Web', status: 'active', route: '/dashboard' },
+  { id: 'mobile', title: 'App Mobile', status: 'soon', route: null },
+];
+
+const FEATURE_ICON_BY_ID = {
+  contratos: FileText,
+  diarios: Newspaper,
+  prazos: Clock3,
+  whatsapp: MessageSquareText,
+  telegram: MessageSquareText,
+  api_rest: LayoutDashboard,
+  privacidade: ShieldCheck,
+  brasil_first: Sparkles,
+  jurisprudencia: Search,
+  docs: FileText,
+  dashboard_web: LayoutDashboard,
+  mobile: BellRing,
+};
+
+const FEATURE_STATUS_LABEL = {
+  active: 'Ativo',
+  setup: 'Configurar',
+  soon: 'Em breve',
+};
+
+const FEATURE_STATUS_STYLE = {
+  active: 'bg-emerald-100 text-emerald-700',
+  setup: 'bg-amber-100 text-amber-700',
+  soon: 'bg-surface-200 text-surface-600',
+};
 
 export default function DashboardPage() {
   const [data, setData] = useState(null);
+  const [features, setFeatures] = useState(FEATURE_FALLBACK);
   const [loading, setLoading] = useState(true);
   const user = getUser();
 
   useEffect(() => {
-    getMe()
-      .then(setData)
-      .catch(() => {})
+    Promise.all([getMe().catch(() => null), getFeatures().catch(() => FEATURE_FALLBACK)])
+      .then(([profile, featureData]) => {
+        if (profile) setData(profile);
+        if (Array.isArray(featureData) && featureData.length > 0) {
+          setFeatures(featureData);
+        }
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -78,10 +127,10 @@ export default function DashboardPage() {
       desc: 'Pesquise publicacoes no Diario Oficial.',
     },
     {
-      label: 'Chat com Dr. Lex',
-      icon: MessageSquareText,
-      href: '/dashboard/chat',
-      desc: 'Tire duvidas juridicas com assistente especializado.',
+      label: 'Status das funcoes',
+      icon: Sparkles,
+      href: '#funcionalidades',
+      desc: 'Consulte o que esta ativo, em setup e em breve.',
     },
   ];
 
@@ -158,7 +207,7 @@ export default function DashboardPage() {
         </section>
       )}
 
-      <section>
+      <section className="mb-10">
         <h2 className="font-display text-2xl text-surface-900 mb-4">Acoes rapidas</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           {quickActions.map((action) => {
@@ -176,6 +225,59 @@ export default function DashboardPage() {
                 <p className="font-semibold text-surface-900 text-sm">{action.label}</p>
                 <p className="text-xs text-surface-400 mt-1">{action.desc}</p>
               </a>
+            );
+          })}
+        </div>
+      </section>
+
+      <section id="funcionalidades">
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <h2 className="font-display text-2xl text-surface-900">Funcionalidades do LegalClaw</h2>
+          <span className="text-xs text-surface-500 rounded-full bg-white border border-surface-200 px-3 py-1">
+            {features.length} itens no catalogo inicial
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {features.map((feature) => {
+            const Icon = FEATURE_ICON_BY_ID[feature.id] || Sparkles;
+            const status = feature.status || 'soon';
+            const isActive = status === 'active';
+            const tagStyle = FEATURE_STATUS_STYLE[status] || FEATURE_STATUS_STYLE.soon;
+            const tagLabel = FEATURE_STATUS_LABEL[status] || FEATURE_STATUS_LABEL.soon;
+
+            return (
+              <div
+                key={feature.id}
+                className={[
+                  'rounded-2xl border p-5 transition-all duration-200',
+                  isActive ? 'border-surface-200/80 bg-white shadow-sm hover:shadow-md' : 'border-surface-200 bg-surface-50',
+                ].join(' ')}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="h-10 w-10 rounded-xl bg-surface-100 text-surface-700 flex items-center justify-center">
+                    <Icon className="h-5 w-5" strokeWidth={2.2} />
+                  </div>
+                  <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${tagStyle}`}>
+                    {tagLabel}
+                  </span>
+                </div>
+
+                <p className="mt-3 font-semibold text-surface-900 text-sm">{feature.title}</p>
+                <p className="text-xs text-surface-500 mt-1 min-h-[38px]">{feature.description || 'Sem descricao cadastrada.'}</p>
+
+                {feature.route && isActive ? (
+                  <a
+                    href={feature.route}
+                    className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-brand-700 hover:text-brand-800"
+                  >
+                    Acessar modulo
+                    <ArrowRight className="h-3.5 w-3.5" strokeWidth={2.3} />
+                  </a>
+                ) : (
+                  <p className="mt-3 text-xs text-surface-400">Disponibilidade condicionada a configuracao.</p>
+                )}
+              </div>
             );
           })}
         </div>
