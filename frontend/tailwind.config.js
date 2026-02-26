@@ -33,9 +33,9 @@ module.exports = {
         },
       },
       fontFamily: {
-        display: ['"DM Serif Display"', 'Georgia', 'serif'],
-        body: ['"DM Sans"', 'system-ui', 'sans-serif'],
-        mono: ['"JetBrains Mono"', 'monospace'],
+        display: ['"Inter"', 'system-ui', 'sans-serif'],
+        body: ['"Inter"', 'system-ui', 'sans-serif'],
+        mono: ['"Inter"', 'system-ui', 'sans-serif'],
       },
     },
   },
