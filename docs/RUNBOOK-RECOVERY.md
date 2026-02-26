@@ -13,6 +13,14 @@ curl -Ik https://drlex.wapify.com.br/health
 
 ## 2) Fluxo padrao de redeploy (sem risco)
 
+Metodo recomendado (nao depende de `git pull` no diretório de producao):
+
+```bash
+bash /var/data/drlex/app/scripts/deploy-from-snapshot.sh drlex https://github.com/oliveermarcelo/legalclaw.git main
+```
+
+Fluxo manual equivalente:
+
 ```bash
 cd /var/data/drlex/app
 git fetch origin
