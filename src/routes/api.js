@@ -1,5 +1,4 @@
 const express = require('express');
-const config = require('../config');
 const contractAnalyzer = require('../services/contract-analyzer');
 const deadlineManager = require('../services/deadline-manager');
 const diarioMonitor = require('../services/diario-monitor');
@@ -50,111 +49,6 @@ function normalizarDataISO(data) {
   if (!parsed) return null;
   return formatarDataISO(parsed);
 }
-
-function buildFeaturesCatalog() {
-  const whatsappConfigured = Boolean(config.evolution.apiKey);
-  const telegramConfigured = Boolean(config.telegram.botToken);
-
-  return [
-    {
-      id: 'contratos',
-      title: 'Analise de Contratos',
-      status: 'active',
-      route: '/contratos',
-      description: 'Analise de contratos com identificacao de riscos e sugestoes.',
-    },
-    {
-      id: 'diarios',
-      title: 'Monitor de Diarios',
-      status: 'active',
-      route: '/diarios',
-      description: 'Busca e monitoramento de DOU, DOE e DOM.',
-    },
-    {
-      id: 'prazos',
-      title: 'Gestao de Prazos',
-      status: 'active',
-      route: '/prazos',
-      description: 'Calculo processual com regras do CPC e alertas.',
-    },
-    {
-      id: 'whatsapp',
-      title: 'WhatsApp Integrado',
-      status: whatsappConfigured ? 'active' : 'setup',
-      route: null,
-      description: 'Fluxo de atendimento via Evolution API.',
-    },
-    {
-      id: 'telegram',
-      title: 'Telegram Bot',
-      status: telegramConfigured ? 'active' : 'setup',
-      route: null,
-      description: 'Bot juridico com comandos e respostas automatizadas.',
-    },
-    {
-      id: 'api_rest',
-      title: 'API REST',
-      status: 'active',
-      route: null,
-      description: 'Endpoints autenticados para integracoes externas.',
-    },
-    {
-      id: 'privacidade',
-      title: 'Privacidade Total',
-      status: 'active',
-      route: null,
-      description: 'Operacao em servidor proprio e conformidade LGPD.',
-    },
-    {
-      id: 'brasil_first',
-      title: 'Brasil First',
-      status: 'active',
-      route: null,
-      description: 'Regras e fluxos orientados ao contexto juridico brasileiro.',
-    },
-    {
-      id: 'jurisprudencia',
-      title: 'Jurisprudencia',
-      status: 'soon',
-      route: null,
-      description: 'Pesquisa de precedentes com resumo inteligente.',
-    },
-    {
-      id: 'docs',
-      title: 'Gerador de Docs',
-      status: 'soon',
-      route: null,
-      description: 'Geracao assistida de pecas e documentos.',
-    },
-    {
-      id: 'dashboard_web',
-      title: 'Dashboard Web',
-      status: 'active',
-      route: '/dashboard',
-      description: 'Painel web para operacao e acompanhamento.',
-    },
-    {
-      id: 'mobile',
-      title: 'App Mobile',
-      status: 'soon',
-      route: null,
-      description: 'Aplicativo iOS/Android com notificacoes e biometria.',
-    },
-  ];
-}
-
-// ============================================================
-// FEATURES / ROADMAP
-// ============================================================
-
-/**
- * GET /api/features
- * Catalogo de funcionalidades e status de ativacao
- */
-router.get('/features', (req, res) => {
-  const data = buildFeaturesCatalog();
-  res.json({ success: true, data });
-});
 
 // ============================================================
 // CONTRATOS
@@ -359,7 +253,7 @@ router.get('/diarios/monitors/:userId', async (req, res) => {
  */
 router.post('/diarios/search', async (req, res) => {
   try {
-    const keyword = req.body.keyword || req.body.query || req.body.term;
+    const { keyword } = req.body;
     if (!keyword) return res.status(400).json({ error: 'keyword é obrigatório' });
     const results = await diarioMonitor.searchDOU(keyword);
     res.json({ success: true, data: results });
@@ -389,4 +283,3 @@ router.post('/chat', async (req, res) => {
 });
 
 module.exports = router;
-
