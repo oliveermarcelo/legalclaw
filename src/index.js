@@ -15,6 +15,7 @@ const evolution = require('./integrations/evolution');
 
 const app = express();
 const HEALTHCHECK_TIMEOUT_MS = Number(process.env.HEALTHCHECK_TIMEOUT_MS || 1500);
+const TRUST_PROXY_HOPS = Number.parseInt(process.env.TRUST_PROXY_HOPS || '1', 10);
 
 function withTimeout(promise, timeoutMs) {
   return Promise.race([
@@ -23,7 +24,7 @@ function withTimeout(promise, timeoutMs) {
   ]);
 }
 
-app.set('trust proxy', true);
+app.set('trust proxy', Number.isNaN(TRUST_PROXY_HOPS) ? 1 : TRUST_PROXY_HOPS);
 
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(
@@ -76,9 +77,12 @@ app.get('/health', async (req, res) => {
       redisClient = new Redis(config.redis.url, {
         lazyConnect: true,
         connectTimeout: 2000,
-        maxRetriesPerRequest: 1,
+        maxRetriesPerRequest: 0,
         enableOfflineQueue: false,
+        retryStrategy: () => null,
       });
+      redisClient.on('error', () => {});
+      await withTimeout(redisClient.connect(), HEALTHCHECK_TIMEOUT_MS);
       const pong = await withTimeout(redisClient.ping(), HEALTHCHECK_TIMEOUT_MS);
       return pong === 'PONG' ? 'ok' : 'error';
     } catch {
