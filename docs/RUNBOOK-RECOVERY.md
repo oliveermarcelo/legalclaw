@@ -51,6 +51,20 @@ bash /var/data/drlex/app/scripts/post-deploy-check.sh drlex https://drlex.wapify
 
 ## 5) Rollback rapido
 
+Preferencialmente use o script automatico:
+
+```bash
+bash /var/data/drlex/app/scripts/rollback-last-stable.sh drlex https://drlex.wapify.com.br
+```
+
+Ou informe uma referencia especifica:
+
+```bash
+bash /var/data/drlex/app/scripts/rollback-last-stable.sh drlex https://drlex.wapify.com.br <commit|tag>
+```
+
+Fallback manual:
+
 ```bash
 cd /var/data/drlex/app
 git log --oneline -n 5

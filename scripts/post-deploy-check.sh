@@ -3,6 +3,8 @@ set -euo pipefail
 
 STACK_NAME="${1:-drlex}"
 BASE_URL="${2:-https://drlex.wapify.com.br}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+APP_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 echo "[check] stack=${STACK_NAME} base_url=${BASE_URL}"
 
@@ -47,5 +49,12 @@ echo "[check] recent logs summary"
 docker service logs --tail 30 "${STACK_NAME}_drlex_frontend" | tail -n 10 || true
 docker service logs --tail 30 "${STACK_NAME}_drlex_api" | tail -n 10 || true
 docker service logs --tail 30 "${STACK_NAME}_drlex_worker" | tail -n 10 || true
+
+if git -C "${APP_DIR}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  mkdir -p "${APP_DIR}/.deploy"
+  stable_commit="$(git -C "${APP_DIR}" rev-parse HEAD)"
+  echo "${stable_commit}" > "${APP_DIR}/.deploy/last-stable-commit"
+  echo "[ok] recorded stable commit: ${stable_commit}"
+fi
 
 echo "[done] post-deploy check passed"

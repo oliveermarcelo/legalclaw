@@ -12,7 +12,7 @@ Estabilizar producao e criar base operacional para evolucao das features core se
 
 - [ ] Padronizar deploy com build unico antes do start.
 - [ ] Garantir que `portainer-stack.yml` e `frontend/portainer-stack.yml` estejam sincronizados.
-- [ ] Definir fluxo oficial de rollback.
+- [ ] Definir fluxo oficial de rollback (script automatico + fallback manual).
 - [ ] Documentar runbook de recovery (`502`, restart loop, cache quebrado).
 
 ### Track B - Saude e Observabilidade
