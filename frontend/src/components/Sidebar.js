@@ -1,12 +1,21 @@
 'use client';
 import { usePathname } from 'next/navigation';
-import { logout, getUser } from '@/lib/api';
+import {
+  Clock3,
+  FileText,
+  LayoutDashboard,
+  LogOut,
+  Newspaper,
+  Scale,
+  ShieldCheck,
+} from 'lucide-react';
+import { getUser, logout } from '@/lib/api';
 
 const NAV_ITEMS = [
-  { href: '/dashboard', label: 'Dashboard', icon: '📊' },
-  { href: '/contratos', label: 'Contratos', icon: '📋' },
-  { href: '/prazos', label: 'Prazos', icon: '⏰' },
-  { href: '/diarios', label: 'Diários', icon: '📰' },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/contratos', label: 'Contratos', icon: FileText },
+  { href: '/prazos', label: 'Prazos', icon: Clock3 },
+  { href: '/diarios', label: 'Diarios', icon: Newspaper },
 ];
 
 export default function Sidebar() {
@@ -14,53 +23,73 @@ export default function Sidebar() {
   const user = getUser();
 
   return (
-    <aside className="w-64 bg-surface-950 min-h-screen flex flex-col border-r border-white/5">
-      {/* Logo */}
-      <div className="px-6 py-6 border-b border-white/5">
+    <aside className="w-72 min-h-screen flex flex-col border-r border-white/10 bg-gradient-to-b from-surface-950 via-[#0d1230] to-[#070b1c]">
+      <div className="px-5 pt-6 pb-5 border-b border-white/10">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-brand-600 rounded-xl flex items-center justify-center">
-            <span className="text-white font-display text-lg">⚖</span>
+          <div className="h-11 w-11 rounded-xl bg-brand-600/95 shadow-lg shadow-brand-900/35 flex items-center justify-center">
+            <Scale className="h-5 w-5 text-white" strokeWidth={2.2} />
           </div>
           <div>
-            <h1 className="font-display text-xl text-white leading-tight">Dr. Lex</h1>
-            <p className="text-surface-300 text-[11px] tracking-wider uppercase">Assistente Jurídico</p>
+            <h1 className="font-display text-3xl leading-none text-white">Dr. Lex</h1>
+            <p className="text-[11px] mt-1 uppercase tracking-[0.14em] text-brand-200/85">Suite Juridica</p>
           </div>
         </div>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 px-4 py-6 space-y-1">
+      <nav className="flex-1 px-4 py-6 space-y-2.5">
         {NAV_ITEMS.map((item) => {
-          const active = pathname === item.href || pathname.startsWith(item.href + '/');
+          const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+          const Icon = item.icon;
+
           return (
             <a
               key={item.href}
               href={item.href}
-              className={`sidebar-link ${active ? 'sidebar-link-active' : ''}`}
+              className={[
+                'group flex items-center gap-3 rounded-2xl px-3 py-3 transition-all duration-200',
+                active
+                  ? 'bg-gradient-to-r from-brand-700/40 to-brand-500/20 border border-brand-300/30 shadow-lg shadow-brand-900/20'
+                  : 'border border-transparent hover:border-white/10 hover:bg-white/5',
+              ].join(' ')}
             >
-              <span className="text-lg">{item.icon}</span>
-              <span>{item.label}</span>
+              <span
+                className={[
+                  'h-9 w-9 rounded-xl flex items-center justify-center transition-colors',
+                  active ? 'bg-brand-500/30 text-brand-100' : 'bg-white/5 text-surface-300 group-hover:text-white',
+                ].join(' ')}
+              >
+                <Icon className="h-4 w-4" strokeWidth={2.3} />
+              </span>
+              <span className={active ? 'text-white font-semibold text-sm' : 'text-surface-200 text-sm'}>
+                {item.label}
+              </span>
             </a>
           );
         })}
       </nav>
 
-      {/* User */}
-      <div className="px-4 py-4 border-t border-white/5">
-        <div className="flex items-center gap-3 px-3 py-2">
-          <div className="w-9 h-9 rounded-full bg-brand-700 flex items-center justify-center text-white text-sm font-semibold">
-            {user?.name?.charAt(0)?.toUpperCase() || 'U'}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-white text-sm font-medium truncate">{user?.name || 'Usuário'}</p>
-            <p className="text-surface-300 text-xs truncate">{user?.plan || 'solo'}</p>
+      <div className="px-4 pb-4 pt-3 border-t border-white/10">
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-brand-700 flex items-center justify-center text-white text-sm font-semibold">
+              {user?.name?.charAt(0)?.toUpperCase() || 'U'}
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-white truncate">{user?.name || 'Usuario'}</p>
+              <div className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-brand-200">
+                <ShieldCheck className="h-3 w-3" strokeWidth={2.2} />
+                <span>{user?.plan || 'solo'}</span>
+              </div>
+            </div>
           </div>
         </div>
+
         <button
           onClick={logout}
-          className="w-full mt-2 text-left px-3 py-2 text-surface-300 hover:text-red-400 text-sm transition-colors rounded-lg hover:bg-white/5"
+          className="w-full mt-2 rounded-xl px-3 py-2.5 text-sm text-surface-200 hover:text-white hover:bg-white/10 transition-colors flex items-center gap-2"
         >
-          ↩ Sair
+          <LogOut className="h-4 w-4" strokeWidth={2.2} />
+          <span>Sair</span>
         </button>
       </div>
     </aside>
