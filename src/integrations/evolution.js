@@ -20,7 +20,15 @@ function authStrategies() {
     {
       headers: {
         apikey: API_KEY,
+      },
+    },
+    {
+      headers: {
         'x-api-key': API_KEY,
+      },
+    },
+    {
+      headers: {
         Authorization: `Bearer ${API_KEY}`,
       },
     },
