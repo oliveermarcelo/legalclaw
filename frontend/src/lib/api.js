@@ -32,23 +32,44 @@ async function request(path, options = {}) {
     ...options.headers,
   };
 
-  const res = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers,
-  });
+  const controller = new AbortController();
+  const timeoutMs = 15000;
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  let res;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      ...options,
+      headers,
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err?.name === 'AbortError') {
+      throw new Error('Tempo de resposta excedido. Tente novamente.');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (res.status === 401) {
     clearToken();
     if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
       window.location.href = '/login';
     }
-    throw new Error('Não autenticado');
+    throw new Error('Nao autenticado');
   }
 
-  const data = await res.json();
+  const raw = await res.text();
+  let data = null;
+  try {
+    data = raw ? JSON.parse(raw) : {};
+  } catch {
+    data = {};
+  }
 
   if (!res.ok) {
-    throw new Error(data.error || 'Erro na requisição');
+    throw new Error(data.error || `Erro na requisicao (${res.status})`);
   }
 
   return data;
@@ -100,7 +121,7 @@ export async function analyzeContract(text, title) {
 
 export async function getContracts() {
   const me = getUser();
-  if (!me) throw new Error('Não autenticado');
+  if (!me) throw new Error('Nao autenticado');
   const data = await request(`/api/contracts/${me.id}`);
   return data.data || [];
 }
@@ -116,7 +137,7 @@ export async function createDeadline(deadline) {
 
 export async function getDeadlines() {
   const me = getUser();
-  if (!me) throw new Error('Não autenticado');
+  if (!me) throw new Error('Nao autenticado');
   const data = await request(`/api/deadlines/${me.id}`);
   return data.data || [];
 }
@@ -167,7 +188,7 @@ export async function getCPCDeadlines() {
   });
 }
 
-// Diários
+// Diarios
 export async function createMonitor(monitor) {
   const data = await request('/api/diarios/monitor', {
     method: 'POST',
@@ -178,7 +199,7 @@ export async function createMonitor(monitor) {
 
 export async function getMonitors() {
   const me = getUser();
-  if (!me) throw new Error('Não autenticado');
+  if (!me) throw new Error('Nao autenticado');
   const data = await request(`/api/diarios/monitors/${me.id}`);
   return data.data || [];
 }
