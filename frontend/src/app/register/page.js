@@ -6,6 +6,13 @@ export default function RegisterPage() {
   const [form, setForm] = useState({ name: '', email: '', password: '', whatsapp: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const planFeatures = [
+    'Analise ilimitada de contratos',
+    'Calculo de prazos CPC',
+    'Monitoramento de diarios',
+    'Alertas via WhatsApp',
+    'Chat com IA juridica',
+  ];
 
   function update(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -46,22 +53,25 @@ export default function RegisterPage() {
             Comece a usar o assistente juridico mais inteligente do Brasil.
           </p>
 
-          <div className="rounded-2xl p-6 border border-white/30 bg-white/95 shadow-xl shadow-black/20">
-            <p className="text-brand-700 font-semibold text-sm mb-2">Plano Solo</p>
-            <p className="text-accent-600 text-3xl font-display mb-4">
-              R$ 197<span className="text-surface-800 text-sm font-body ml-1">/mes</span>
-            </p>
-            <ul className="space-y-2 text-sm text-surface-800">
-              {[
-                'Analise ilimitada de contratos',
-                'Calculo de prazos CPC',
-                'Monitoramento de diarios',
-                'Alertas via WhatsApp',
-                'Chat com IA juridica',
-              ].map((item) => (
-                <li key={item} className="flex items-center gap-2">
-                  <span className="inline-block w-2 h-2 rounded-full bg-emerald-600" />
-                  <span>{item}</span>
+          <div className="overflow-hidden rounded-3xl border border-brand-900/10 bg-gradient-to-b from-white to-surface-100 shadow-2xl shadow-black/25">
+            <div className="border-b border-surface-200/80 bg-gradient-to-r from-brand-50 to-white px-6 pb-5 pt-6">
+              <span className="inline-flex items-center rounded-full bg-brand-700/10 px-3 py-1 text-xs font-semibold tracking-wide text-brand-700">
+                Plano Solo
+              </span>
+              <div className="mt-3 flex items-end gap-1">
+                <span className="font-display text-5xl leading-none text-brand-800">R$ 197</span>
+                <span className="mb-1 text-base text-surface-500">/mes</span>
+              </div>
+              <p className="mt-2 text-sm text-surface-600">Ideal para autonomos e pequenos escritorios.</p>
+            </div>
+
+            <ul className="space-y-2 p-6">
+              {planFeatures.map((item) => (
+                <li key={item} className="flex items-center gap-3 rounded-xl border border-surface-200/80 bg-white px-3 py-2">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-700">
+                    +
+                  </span>
+                  <span className="text-sm font-medium text-surface-800">{item}</span>
                 </li>
               ))}
             </ul>
