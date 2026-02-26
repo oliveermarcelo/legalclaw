@@ -1,43 +1,55 @@
 require('dotenv').config();
 
+function cleanEnv(value, fallback = '') {
+  return String(value ?? fallback)
+    .trim()
+    .replace(/^['"]|['"]$/g, '');
+}
+
+function cleanUrl(value, fallback = '') {
+  const raw = cleanEnv(value, fallback).replace(/\/+$/, '');
+  if (!raw) return '';
+  return /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+}
+
 module.exports = {
   port: parseInt(process.env.PORT || '3000'),
   nodeEnv: process.env.NODE_ENV || 'development',
 
   // IA (multi-provider)
   ai: {
-    provider: (process.env.AI_PROVIDER || 'anthropic').trim().toLowerCase(), // 'anthropic' ou 'gemini'
+    provider: cleanEnv(process.env.AI_PROVIDER, 'anthropic').toLowerCase(), // 'anthropic' ou 'gemini'
     // Gemini
-    geminiApiKey: (process.env.GEMINI_API_KEY || '').trim(),
-    geminiModel: (process.env.GEMINI_MODEL || 'gemini-2.0-flash').trim(),
+    geminiApiKey: cleanEnv(process.env.GEMINI_API_KEY),
+    geminiModel: cleanEnv(process.env.GEMINI_MODEL, 'gemini-2.0-flash'),
     // Anthropic
-    anthropicApiKey: (process.env.ANTHROPIC_API_KEY || '').trim(),
-    anthropicModel: (process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514').trim(),
+    anthropicApiKey: cleanEnv(process.env.ANTHROPIC_API_KEY),
+    anthropicModel: cleanEnv(process.env.ANTHROPIC_MODEL, 'claude-sonnet-4-20250514'),
     // Geral
     maxTokens: parseInt(process.env.AI_MAX_TOKENS || '4096'),
   },
 
   // PostgreSQL
   database: {
-    url: process.env.DATABASE_URL || 'postgresql://drlex:drlex_secret@localhost:5432/drlex',
+    url: cleanEnv(process.env.DATABASE_URL, 'postgresql://drlex:drlex_secret@localhost:5432/drlex'),
   },
 
   // Redis
   redis: {
-    url: process.env.REDIS_URL || 'redis://localhost:6379',
+    url: cleanEnv(process.env.REDIS_URL, 'redis://localhost:6379'),
   },
 
   // Evolution API (WhatsApp)
   evolution: {
-    apiUrl: (process.env.EVOLUTION_API_URL || 'https://api.wapify.com.br').trim().replace(/\/+$/, ''),
-    apiKey: (process.env.EVOLUTION_API_KEY || '').trim(),
-    instance: (process.env.EVOLUTION_INSTANCE || 'drlex').trim(),
-    webhookUrl: (process.env.EVOLUTION_WEBHOOK_URL || '').trim(),
+    apiUrl: cleanUrl(process.env.EVOLUTION_API_URL, 'https://api.wapify.com.br'),
+    apiKey: cleanEnv(process.env.EVOLUTION_API_KEY),
+    instance: cleanEnv(process.env.EVOLUTION_INSTANCE, 'drlex'),
+    webhookUrl: cleanUrl(process.env.EVOLUTION_WEBHOOK_URL),
   },
 
   // Telegram
   telegram: {
-    botToken: process.env.TELEGRAM_BOT_TOKEN || '',
+    botToken: cleanEnv(process.env.TELEGRAM_BOT_TOKEN),
   },
 
   // JWT
