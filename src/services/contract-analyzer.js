@@ -1,6 +1,7 @@
 const ai = require('./ai');
 const { pool } = require('../config/migrate');
 const logger = require('../utils/logger');
+const config = require('../config');
 
 const CONTRACT_SYSTEM = `Voce e um especialista em analise contratual brasileira.
 
@@ -28,17 +29,74 @@ Responda em JSON com esta estrutura:
   "recomendacao": ""
 }`;
 
+function hasStructuredContractShape(parsed) {
+  return Boolean(
+    parsed &&
+    typeof parsed === 'object' &&
+    parsed.resumo &&
+    Array.isArray(parsed.clausulas_risco)
+  );
+}
+
+function shouldAutoEscalateTo4o(modelConfig, requestedModel, contractTextLength) {
+  if (requestedModel) return false;
+  if (modelConfig.provider !== 'openai') return false;
+  if (modelConfig.defaultModel !== 'gpt-4o-mini') return false;
+  if (!modelConfig.availableModels.includes('gpt-4o')) return false;
+
+  const threshold = Number(config.ai.openaiAutoEscalateChars || 18000);
+  return Number.isFinite(threshold) && contractTextLength >= threshold;
+}
+
 /**
  * Analisa um contrato e salva no banco
  */
 async function analyze(contractText, userId = null, title = '', options = {}) {
   logger.info('Iniciando analise de contrato', { userId, textLength: contractText.length });
 
-  const result = await ai.analyzeStructured(
+  const modelConfig = ai.getModelConfig();
+  const requestedModel = String(options?.model || '').trim();
+
+  let selectedModel = requestedModel;
+  let escalationReason = '';
+
+  if (shouldAutoEscalateTo4o(modelConfig, requestedModel, contractText.length)) {
+    selectedModel = 'gpt-4o';
+    escalationReason = `texto_longo:${contractText.length}`;
+    logger.info('Escalonando analise para gpt-4o por tamanho do contrato', {
+      textLength: contractText.length,
+      threshold: Number(config.ai.openaiAutoEscalateChars || 18000),
+    });
+  }
+
+  const initialOptions = {
+    ...options,
+    ...(selectedModel ? { model: selectedModel } : {}),
+  };
+
+  let result = await ai.analyzeStructured(
     `Analise o seguinte contrato:\n\n${contractText}`,
     CONTRACT_SYSTEM,
-    options
+    initialOptions
   );
+
+  const canRetryWith4o = (
+    !requestedModel &&
+    modelConfig.provider === 'openai' &&
+    modelConfig.defaultModel === 'gpt-4o-mini' &&
+    modelConfig.availableModels.includes('gpt-4o') &&
+    result.model !== 'gpt-4o'
+  );
+
+  if (canRetryWith4o && !hasStructuredContractShape(result.parsed)) {
+    escalationReason = escalationReason || 'saida_estruturada_invalida';
+    logger.warn('Reexecutando analise com gpt-4o por estrutura invalida no resultado inicial');
+    result = await ai.analyzeStructured(
+      `Analise o seguinte contrato:\n\n${contractText}`,
+      CONTRACT_SYSTEM,
+      { ...options, model: 'gpt-4o' }
+    );
+  }
 
   // Determinar nivel de risco geral
   let riskLevel = 'BAIXO';
@@ -80,6 +138,8 @@ async function analyze(contractText, userId = null, title = '', options = {}) {
     analysis: result.parsed || { raw: result.text },
     riskLevel,
     model: result.model,
+    autoEscalated: Boolean(escalationReason),
+    escalationReason: escalationReason || null,
     usage: result.usage,
   };
 }

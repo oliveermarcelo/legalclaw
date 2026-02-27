@@ -31,6 +31,7 @@ module.exports = {
     openaiModel: cleanEnv(process.env.OPENAI_MODEL, 'gpt-4o-mini'),
     openaiAllowedModels: cleanCsv(process.env.OPENAI_ALLOWED_MODELS, 'gpt-4o-mini,gpt-4o'),
     openaiBaseUrl: cleanUrl(process.env.OPENAI_BASE_URL, 'https://api.openai.com/v1'),
+    openaiAutoEscalateChars: parseInt(process.env.OPENAI_AUTO_ESCALATE_CHARS || '18000', 10),
     // Gemini
     geminiApiKey: cleanEnv(process.env.GEMINI_API_KEY),
     geminiModel: cleanEnv(process.env.GEMINI_MODEL, 'gemini-2.0-flash'),
