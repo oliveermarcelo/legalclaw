@@ -68,6 +68,14 @@ check_endpoint "${BASE_URL}/health/live" "200" "/health/live"
 check_endpoint "${BASE_URL}/" "200" "/"
 check_endpoint "${BASE_URL}/health" "200" "/health (deep)" "false" "8" "3" || true
 
+echo "[check] validating frontend static assets"
+css_path="$(curl -sS --max-time 8 "${BASE_URL}/login" | grep -oE '/_next/static/css/[^"]+\.css' | head -n1 || true)"
+if [[ -z "${css_path}" ]]; then
+  echo "[error] could not extract css asset path from /login"
+  exit 1
+fi
+check_endpoint "${BASE_URL}${css_path}" "200" "${css_path}"
+
 echo "[check] recent logs summary"
 docker service logs --tail 30 "${STACK_NAME}_drlex_frontend" | tail -n 10 || true
 docker service logs --tail 30 "${STACK_NAME}_drlex_api" | tail -n 10 || true

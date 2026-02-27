@@ -46,6 +46,20 @@ echo "[deploy] rebuilding frontend artifacts"
 rm -rf "${FRONTEND_DIR}/node_modules" "${FRONTEND_DIR}/.next"
 docker run --rm -v "${FRONTEND_DIR}:/app" -w /app node:18-alpine sh -lc "npm install --include=dev && npm run build"
 
+# Next standalone server.js serves static files from .next/standalone/.next/static.
+# Keep these artifacts in sync to avoid 404 on /_next/static/* in production.
+if [[ -d "${FRONTEND_DIR}/.next/standalone" ]]; then
+  echo "[deploy] syncing standalone static assets"
+  mkdir -p "${FRONTEND_DIR}/.next/standalone/.next"
+  rm -rf "${FRONTEND_DIR}/.next/standalone/.next/static"
+  cp -R "${FRONTEND_DIR}/.next/static" "${FRONTEND_DIR}/.next/standalone/.next/static"
+
+  if [[ -d "${FRONTEND_DIR}/public" ]]; then
+    mkdir -p "${FRONTEND_DIR}/.next/standalone/public"
+    rsync -a --delete "${FRONTEND_DIR}/public/" "${FRONTEND_DIR}/.next/standalone/public/"
+  fi
+fi
+
 if [[ -f "${APP_DIR}/.env" ]]; then
   echo "[deploy] loading env from ${APP_DIR}/.env"
   set -a
