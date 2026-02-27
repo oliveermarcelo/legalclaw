@@ -316,6 +316,14 @@ export async function searchExternalProcessByCnj(payload) {
   return data.data || data;
 }
 
+export async function searchExternalProcesses(payload) {
+  const data = await request('/api/external/processes/search', {
+    method: 'POST',
+    body: JSON.stringify(payload || {}),
+  });
+  return data.data || data;
+}
+
 export async function requestExternalProcessRefresh(payload) {
   const data = await request('/api/external/processes/request-refresh', {
     method: 'POST',

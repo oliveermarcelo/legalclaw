@@ -1,19 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
   Loader2,
-  RefreshCcw,
   Search,
   Sparkles,
 } from 'lucide-react';
 import {
-  getExternalProcessRefreshStatus,
   getExternalProvidersStatus,
-  requestExternalProcessRefresh,
   searchExternalProcessByCnj,
+  searchExternalProcesses,
 } from '@/lib/api';
 
 function prettyJson(value) {
@@ -33,10 +31,12 @@ export default function ConsultasExternasPage() {
   const [result, setResult] = useState(null);
 
   const [cnj, setCnj] = useState('');
-  const [includeInvolved, setIncludeInvolved] = useState(false);
-  const [includePublicDocuments, setIncludePublicDocuments] = useState(false);
-  const [autos, setAutos] = useState(true);
-  const [useCertificate, setUseCertificate] = useState(false);
+  const [tribunalAlias, setTribunalAlias] = useState('');
+  const [termoLivre, setTermoLivre] = useState('');
+  const [classeCodigo, setClasseCodigo] = useState('');
+  const [orgaoJulgadorCodigo, setOrgaoJulgadorCodigo] = useState('');
+  const [assuntoCodigo, setAssuntoCodigo] = useState('');
+  const [size, setSize] = useState(10);
 
   useEffect(() => {
     let active = true;
@@ -46,6 +46,11 @@ export default function ConsultasExternasPage() {
         const data = await getExternalProvidersStatus();
         if (!active) return;
         setProviderStatus(data);
+
+        const currentProvider = data?.provider;
+        const providerConfig = data?.providers?.find((item) => item.id === currentProvider);
+        const firstAlias = providerConfig?.aliases?.[0] || '';
+        setTribunalAlias(firstAlias);
       } catch (err) {
         if (!active) return;
         setError(err?.message || 'Erro ao carregar status das integracoes externas');
@@ -60,7 +65,14 @@ export default function ConsultasExternasPage() {
     };
   }, []);
 
-  async function runAction(action) {
+  const activeProvider = providerStatus?.provider || '-';
+  const providerConfig = useMemo(
+    () => providerStatus?.providers?.find((item) => item.id === activeProvider) || null,
+    [providerStatus, activeProvider]
+  );
+  const aliases = Array.isArray(providerConfig?.aliases) ? providerConfig.aliases : [];
+
+  async function handleSearchByCnj() {
     setError('');
     setSuccess('');
     setResult(null);
@@ -72,40 +84,54 @@ export default function ConsultasExternasPage() {
 
     setRunning(true);
     try {
-      if (action === 'search') {
-        const data = await searchExternalProcessByCnj({
-          numeroCnj: cnj.trim(),
-          includeInvolved,
-          includePublicDocuments,
-        });
-        setResult(data);
-        setSuccess('Consulta do processo realizada com sucesso.');
-      }
-
-      if (action === 'refresh') {
-        const data = await requestExternalProcessRefresh({
-          numeroCnj: cnj.trim(),
-          autos,
-          useCertificate,
-        });
-        setResult(data);
-        setSuccess('Solicitacao de atualizacao enviada.');
-      }
-
-      if (action === 'status') {
-        const data = await getExternalProcessRefreshStatus({ numeroCnj: cnj.trim() });
-        setResult(data);
-        setSuccess('Status de atualizacao consultado.');
-      }
+      const data = await searchExternalProcessByCnj({
+        numeroCnj: cnj.trim(),
+        tribunalAlias: tribunalAlias.trim() || undefined,
+        size,
+      });
+      setResult(data);
+      setSuccess('Consulta por CNJ realizada com sucesso.');
     } catch (err) {
-      setError(err?.message || 'Erro na consulta externa');
+      setError(err?.message || 'Erro na consulta por CNJ');
     } finally {
       setRunning(false);
     }
   }
 
-  const activeProvider = providerStatus?.provider || '-';
-  const providerConfigured = providerStatus?.providers?.find((p) => p.id === activeProvider)?.configured;
+  async function handleAdvancedSearch() {
+    setError('');
+    setSuccess('');
+    setResult(null);
+
+    if (!tribunalAlias.trim()) {
+      setError('Selecione um tribunal (alias) para a busca avancada.');
+      return;
+    }
+
+    if (!cnj.trim() && !termoLivre.trim() && !classeCodigo.trim() && !orgaoJulgadorCodigo.trim() && !assuntoCodigo.trim()) {
+      setError('Informe ao menos um filtro para a busca avancada.');
+      return;
+    }
+
+    setRunning(true);
+    try {
+      const data = await searchExternalProcesses({
+        tribunalAlias: tribunalAlias.trim(),
+        numeroCnj: cnj.trim() || undefined,
+        termoLivre: termoLivre.trim() || undefined,
+        classeCodigo: classeCodigo.trim() || undefined,
+        orgaoJulgadorCodigo: orgaoJulgadorCodigo.trim() || undefined,
+        assuntoCodigo: assuntoCodigo.trim() || undefined,
+        size,
+      });
+      setResult(data);
+      setSuccess('Busca avancada realizada com sucesso.');
+    } catch (err) {
+      setError(err?.message || 'Erro na busca avancada');
+    } finally {
+      setRunning(false);
+    }
+  }
 
   return (
     <div className="animate-fade-in">
@@ -116,17 +142,17 @@ export default function ConsultasExternasPage() {
         </span>
         <h1 className="font-display text-4xl text-surface-900 mt-3 mb-2">Consultas Externas</h1>
         <p className="text-surface-400 text-lg">
-          Consulte processo por CNJ, solicite atualizacao e acompanhe status em base externa.
+          DataJud/CNJ: busque processos por CNJ e por filtros juridicos.
         </p>
       </header>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <section className="rounded-3xl border border-surface-200/80 bg-white p-6 shadow-sm">
-          <h2 className="font-display text-2xl text-surface-900 mb-1">Consulta de processo</h2>
+          <h2 className="font-display text-2xl text-surface-900 mb-1">Consulta DataJud</h2>
           <p className="text-sm text-surface-400 mb-5">
             Provider ativo: <span className="font-semibold text-surface-700">{activeProvider}</span>
             {' | '}
-            Configurado: <span className="font-semibold text-surface-700">{providerConfigured ? 'sim' : 'nao'}</span>
+            Configurado: <span className="font-semibold text-surface-700">{providerConfig?.configured ? 'sim' : 'nao'}</span>
           </p>
 
           {loadingMeta ? (
@@ -136,60 +162,83 @@ export default function ConsultasExternasPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              <input
-                className="input-field"
-                value={cnj}
-                onChange={(e) => setCnj(e.target.value)}
-                placeholder="Numero CNJ (ex: 0000000-00.0000.0.00.0000)"
-              />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <input
+                  className="input-field"
+                  value={cnj}
+                  onChange={(e) => setCnj(e.target.value)}
+                  placeholder="Numero CNJ"
+                />
 
-              <label className="flex items-center gap-2 text-sm text-surface-700">
-                <input type="checkbox" checked={includeInvolved} onChange={(e) => setIncludeInvolved(e.target.checked)} />
-                Incluir envolvidos
-              </label>
-              <label className="flex items-center gap-2 text-sm text-surface-700">
-                <input type="checkbox" checked={includePublicDocuments} onChange={(e) => setIncludePublicDocuments(e.target.checked)} />
-                Incluir documentos publicos
-              </label>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <button
-                  className="btn-primary inline-flex items-center justify-center gap-2"
-                  disabled={running}
-                  onClick={() => runAction('search')}
+                <select
+                  className="input-field"
+                  value={tribunalAlias}
+                  onChange={(e) => setTribunalAlias(e.target.value)}
                 >
-                  {running ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2.2} /> : <Search className="h-4 w-4" strokeWidth={2.2} />}
-                  Consultar
-                </button>
-
-                <button
-                  className="btn-secondary inline-flex items-center justify-center gap-2"
-                  disabled={running}
-                  onClick={() => runAction('refresh')}
-                >
-                  <RefreshCcw className="h-4 w-4" strokeWidth={2.2} />
-                  Solicitar atualizacao
-                </button>
-
-                <button
-                  className="btn-secondary inline-flex items-center justify-center gap-2"
-                  disabled={running}
-                  onClick={() => runAction('status')}
-                >
-                  <Search className="h-4 w-4" strokeWidth={2.2} />
-                  Ver status
-                </button>
+                  <option value="">Selecionar alias</option>
+                  {aliases.map((alias) => (
+                    <option key={alias} value={alias}>{alias}</option>
+                  ))}
+                </select>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <label className="flex items-center gap-2 text-sm text-surface-700">
-                  <input type="checkbox" checked={autos} onChange={(e) => setAutos(e.target.checked)} />
-                  Atualizar autos
-                </label>
-                <label className="flex items-center gap-2 text-sm text-surface-700">
-                  <input type="checkbox" checked={useCertificate} onChange={(e) => setUseCertificate(e.target.checked)} />
-                  Usar certificado digital
-                </label>
+                <input
+                  className="input-field"
+                  value={termoLivre}
+                  onChange={(e) => setTermoLivre(e.target.value)}
+                  placeholder="Termo livre (classe, assunto, movimento...)"
+                />
+                <input
+                  type="number"
+                  className="input-field"
+                  value={size}
+                  onChange={(e) => setSize(Number(e.target.value || 10))}
+                  min={1}
+                  max={50}
+                  placeholder="Quantidade"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <input
+                  className="input-field"
+                  value={classeCodigo}
+                  onChange={(e) => setClasseCodigo(e.target.value)}
+                  placeholder="Codigo da classe"
+                />
+                <input
+                  className="input-field"
+                  value={orgaoJulgadorCodigo}
+                  onChange={(e) => setOrgaoJulgadorCodigo(e.target.value)}
+                  placeholder="Codigo do orgao"
+                />
+                <input
+                  className="input-field"
+                  value={assuntoCodigo}
+                  onChange={(e) => setAssuntoCodigo(e.target.value)}
+                  placeholder="Codigo do assunto"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <button
+                  className="btn-primary inline-flex items-center justify-center gap-2"
+                  disabled={running}
+                  onClick={handleSearchByCnj}
+                >
+                  {running ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2.2} /> : <Search className="h-4 w-4" strokeWidth={2.2} />}
+                  Buscar por CNJ
+                </button>
+
+                <button
+                  className="btn-secondary inline-flex items-center justify-center gap-2"
+                  disabled={running}
+                  onClick={handleAdvancedSearch}
+                >
+                  <Search className="h-4 w-4" strokeWidth={2.2} />
+                  Busca avancada
+                </button>
               </div>
             </div>
           )}
@@ -211,7 +260,7 @@ export default function ConsultasExternasPage() {
 
         <section className="rounded-3xl border border-surface-200/80 bg-white p-6 shadow-sm">
           <h2 className="font-display text-2xl text-surface-900 mb-1">Resultado</h2>
-          <p className="text-sm text-surface-400 mb-5">Resposta bruta da integracao externa.</p>
+          <p className="text-sm text-surface-400 mb-5">Resposta bruta da API DataJud.</p>
 
           <pre className="rounded-2xl border border-surface-200 bg-surface-50 p-4 text-xs leading-relaxed text-surface-800 overflow-auto max-h-[70vh] whitespace-pre-wrap break-all">
             {result ? prettyJson(result) : 'Sem resultado ainda.'}

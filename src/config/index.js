@@ -74,12 +74,17 @@ module.exports = {
 
   // Consultas externas juridicas
   externalLegal: {
-    provider: cleanEnv(process.env.EXTERNAL_LEGAL_PROVIDER, 'escavador').toLowerCase(),
-    escavadorEnabled: cleanBool(process.env.ESCAVADOR_ENABLED, false),
-    escavadorApiKey: cleanEnv(process.env.ESCAVADOR_API_KEY),
-    escavadorBaseUrl: cleanUrl(process.env.ESCAVADOR_BASE_URL, 'https://api.escavador.com'),
-    escavadorTimeoutMs: parseInt(process.env.ESCAVADOR_TIMEOUT_MS || '20000', 10),
-    escavadorMaxPerPage: parseInt(process.env.ESCAVADOR_MAX_PER_PAGE || '50', 10),
+    provider: cleanEnv(process.env.EXTERNAL_LEGAL_PROVIDER, 'datajud').toLowerCase(),
+    datajudEnabled: cleanBool(process.env.DATAJUD_ENABLED, false),
+    datajudApiKey: cleanEnv(process.env.DATAJUD_API_KEY),
+    datajudBaseUrl: cleanUrl(process.env.DATAJUD_BASE_URL, 'https://api-publica.datajud.cnj.jus.br'),
+    datajudTimeoutMs: parseInt(process.env.DATAJUD_TIMEOUT_MS || '20000', 10),
+    datajudMaxPerPage: parseInt(process.env.DATAJUD_MAX_PER_PAGE || '50', 10),
+    datajudDefaultAlias: cleanEnv(process.env.DATAJUD_DEFAULT_ALIAS, 'api_publica_tjba'),
+    datajudAliases: cleanCsv(
+      process.env.DATAJUD_ALIASES,
+      'api_publica_tjba,api_publica_tjsp,api_publica_tjmg,api_publica_tjrj,api_publica_tjrs,api_publica_trf1,api_publica_trf2,api_publica_trf3,api_publica_trf4,api_publica_trf5,api_publica_stj,api_publica_tst,api_publica_tse,api_publica_stm'
+    ),
   },
 
   // JWT

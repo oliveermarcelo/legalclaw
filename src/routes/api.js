@@ -513,10 +513,10 @@ router.get('/external/providers/status', (req, res) => {
  */
 router.post('/external/processes/by-cnj', async (req, res) => {
   try {
-    const { numeroCnj, includeInvolved, includePublicDocuments } = req.body;
+    const { numeroCnj, tribunalAlias, size, from } = req.body;
     const result = await externalLegalSearch.searchProcessByCnj(
       numeroCnj,
-      { includeInvolved: includeInvolved === true, includePublicDocuments: includePublicDocuments === true },
+      { tribunalAlias, size, from },
       req.user?.userId || null
     );
     res.json({ success: true, data: result });
@@ -527,40 +527,40 @@ router.post('/external/processes/by-cnj', async (req, res) => {
 });
 
 /**
- * POST /api/external/processes/request-refresh
- * Solicita atualizacao de processo na base externa
+ * POST /api/external/processes/search
+ * Busca avancada no DataJud por filtros
  */
-router.post('/external/processes/request-refresh', async (req, res) => {
+router.post('/external/processes/search', async (req, res) => {
   try {
-    const { numeroCnj, autos, useCertificate } = req.body;
-    const result = await externalLegalSearch.requestProcessRefresh(
-      numeroCnj,
-      { autos: autos === true, useCertificate: useCertificate === true },
+    const result = await externalLegalSearch.searchProcesses(
+      req.body || {},
       req.user?.userId || null
     );
     res.json({ success: true, data: result });
   } catch (err) {
-    logger.error('Erro ao solicitar atualizacao externa:', err.message);
-    res.status(400).json({ error: err.message || 'Erro ao solicitar atualizacao externa' });
+    logger.error('Erro na busca avancada DataJud:', err.message);
+    res.status(400).json({ error: err.message || 'Erro na busca avancada DataJud' });
   }
 });
 
 /**
- * POST /api/external/processes/refresh-status
- * Consulta status da atualizacao de processo na base externa
+ * POST /api/external/processes/request-refresh
+ * Endpoint mantido para compatibilidade
  */
-router.post('/external/processes/refresh-status', async (req, res) => {
-  try {
-    const { numeroCnj } = req.body;
-    const result = await externalLegalSearch.getProcessRefreshStatus(
-      numeroCnj,
-      req.user?.userId || null
-    );
-    res.json({ success: true, data: result });
-  } catch (err) {
-    logger.error('Erro ao consultar status de atualizacao externa:', err.message);
-    res.status(400).json({ error: err.message || 'Erro ao consultar status de atualizacao externa' });
-  }
+router.post('/external/processes/request-refresh', (req, res) => {
+  res.status(400).json({
+    error: 'DataJud API publica nao suporta solicitacao de atualizacao de processo por este endpoint.',
+  });
+});
+
+/**
+ * POST /api/external/processes/refresh-status
+ * Endpoint mantido para compatibilidade
+ */
+router.post('/external/processes/refresh-status', (req, res) => {
+  res.status(400).json({
+    error: 'DataJud API publica nao suporta consulta de status de atualizacao por este endpoint.',
+  });
 });
 
 /**

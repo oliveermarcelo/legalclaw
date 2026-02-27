@@ -95,7 +95,7 @@ export default function DashboardPage() {
       label: 'Consultas externas',
       icon: Link2,
       href: '/consultas-externas',
-      desc: 'Buscar processo externo por CNJ e acompanhar atualizacao.',
+      desc: 'Buscar processos no DataJud por CNJ e filtros juridicos.',
     },
   ];
 
