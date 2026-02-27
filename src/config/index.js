@@ -18,7 +18,11 @@ module.exports = {
 
   // IA (multi-provider)
   ai: {
-    provider: cleanEnv(process.env.AI_PROVIDER, 'anthropic').toLowerCase(), // 'anthropic' ou 'gemini'
+    provider: cleanEnv(process.env.AI_PROVIDER, 'anthropic').toLowerCase(), // 'anthropic', 'gemini' ou 'openai'
+    // OpenAI
+    openaiApiKey: cleanEnv(process.env.OPENAI_API_KEY),
+    openaiModel: cleanEnv(process.env.OPENAI_MODEL, 'gpt-4o-mini'),
+    openaiBaseUrl: cleanUrl(process.env.OPENAI_BASE_URL, 'https://api.openai.com/v1'),
     // Gemini
     geminiApiKey: cleanEnv(process.env.GEMINI_API_KEY),
     geminiModel: cleanEnv(process.env.GEMINI_MODEL, 'gemini-2.0-flash'),

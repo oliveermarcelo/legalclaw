@@ -93,10 +93,11 @@ app.get('/health', async (req, res) => {
   })();
 
   const aiProvider = (config.ai.provider || '').toLowerCase();
-  const aiSupported = aiProvider === 'anthropic' || aiProvider === 'gemini';
+  const aiSupported = aiProvider === 'anthropic' || aiProvider === 'gemini' || aiProvider === 'openai';
   const aiConfigured =
     (aiProvider === 'anthropic' && Boolean(config.ai.anthropicApiKey)) ||
-    (aiProvider === 'gemini' && Boolean(config.ai.geminiApiKey));
+    (aiProvider === 'gemini' && Boolean(config.ai.geminiApiKey)) ||
+    (aiProvider === 'openai' && Boolean(config.ai.openaiApiKey));
   checks.ai = !aiSupported
     ? `${aiProvider || 'unknown'}:unsupported`
     : aiConfigured
