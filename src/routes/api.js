@@ -4,6 +4,7 @@ const pdfParse = require('pdf-parse');
 const contractAnalyzer = require('../services/contract-analyzer');
 const deadlineManager = require('../services/deadline-manager');
 const diarioMonitor = require('../services/diario-monitor');
+const knowledgeBase = require('../services/knowledge-base');
 const ai = require('../services/ai');
 const logger = require('../utils/logger');
 
@@ -81,6 +82,19 @@ function normalizarDataISO(data) {
   const parsed = parseDataEntrada(data);
   if (!parsed) return null;
   return formatarDataISO(parsed);
+}
+
+function normalizeHistory(history) {
+  if (!Array.isArray(history)) return [];
+
+  return history
+    .filter((item) => item && (item.role === 'user' || item.role === 'assistant'))
+    .map((item) => ({
+      role: item.role,
+      content: String(item.content || '').trim(),
+    }))
+    .filter((item) => item.content.length > 0)
+    .slice(-12);
 }
 
 // ============================================================
@@ -334,6 +348,117 @@ router.post('/diarios/search', async (req, res) => {
 });
 
 // ============================================================
+// BASE DE CONHECIMENTO (RAG)
+// ============================================================
+
+/**
+ * POST /api/knowledge/sources
+ * Cria nova fonte da base de conhecimento
+ */
+router.post('/knowledge/sources', async (req, res) => {
+  try {
+    const { title, content, sourceType, sourceRef, metadata } = req.body;
+
+    if (!title || !content) {
+      return res.status(400).json({ error: 'title e content sao obrigatorios' });
+    }
+
+    const source = await knowledgeBase.createSource({
+      title,
+      content,
+      sourceType,
+      sourceRef,
+      metadata,
+      createdBy: req.user?.userId || null,
+    });
+
+    res.json({ success: true, data: source });
+  } catch (err) {
+    logger.error('Erro ao criar fonte de conhecimento:', err.message);
+
+    if (err.message?.includes('obrigatorio') || err.message?.includes('curto')) {
+      return res.status(400).json({ error: err.message });
+    }
+
+    res.status(500).json({ error: 'Erro ao criar fonte de conhecimento' });
+  }
+});
+
+/**
+ * GET /api/knowledge/sources
+ * Lista fontes da base de conhecimento do usuario
+ */
+router.get('/knowledge/sources', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit, 10) || 50;
+    const sources = await knowledgeBase.listSources(limit, req.user?.userId || null);
+    res.json({ success: true, data: sources });
+  } catch (err) {
+    logger.error('Erro ao listar fontes de conhecimento:', err.message);
+    res.status(500).json({ error: 'Erro ao listar fontes de conhecimento' });
+  }
+});
+
+/**
+ * PATCH /api/knowledge/sources/:id/active
+ * Ativa ou desativa uma fonte
+ */
+router.patch('/knowledge/sources/:id/active', async (req, res) => {
+  try {
+    const sourceId = parseInt(req.params.id, 10);
+    const { active } = req.body;
+
+    if (!Number.isInteger(sourceId) || sourceId < 1) {
+      return res.status(400).json({ error: 'id invalido' });
+    }
+
+    if (typeof active !== 'boolean') {
+      return res.status(400).json({ error: 'active deve ser boolean' });
+    }
+
+    const source = await knowledgeBase.setSourceActive(
+      sourceId,
+      active,
+      req.user?.userId || null
+    );
+
+    if (!source) {
+      return res.status(404).json({ error: 'Fonte nao encontrada' });
+    }
+
+    res.json({ success: true, data: source });
+  } catch (err) {
+    logger.error('Erro ao alterar status da fonte:', err.message);
+    res.status(500).json({ error: 'Erro ao alterar status da fonte' });
+  }
+});
+
+/**
+ * POST /api/knowledge/search
+ * Busca na base de conhecimento do usuario
+ */
+router.post('/knowledge/search', async (req, res) => {
+  try {
+    const { query, limit } = req.body;
+
+    if (!query || String(query).trim().length < 3) {
+      return res.status(400).json({ error: 'query deve ter pelo menos 3 caracteres' });
+    }
+
+    const hits = await knowledgeBase.search(
+      String(query),
+      limit || 5,
+      req.user?.userId || null
+    );
+
+    res.json({ success: true, data: hits });
+  } catch (err) {
+    logger.error('Erro na busca da base de conhecimento:', err.message);
+    res.status(500).json({ error: 'Erro na busca da base de conhecimento' });
+  }
+});
+
+// ============================================================
 // CHAT (IA)
 // ============================================================
 
@@ -344,9 +469,43 @@ router.post('/diarios/search', async (req, res) => {
 router.post('/chat', async (req, res) => {
   try {
     const { message, history } = req.body;
-    if (!message) return res.status(400).json({ error: 'message é obrigatório' });
-    const result = await ai.chat(message, '', history || []);
-    res.json({ success: true, data: result });
+    if (!message) return res.status(400).json({ error: 'message e obrigatorio' });
+
+    const safeHistory = normalizeHistory(history);
+    let sources = [];
+    let systemPromptExtra = '';
+
+    try {
+      const hits = await knowledgeBase.search(
+        String(message),
+        5,
+        req.user?.userId || null
+      );
+
+      if (hits.length > 0) {
+        const built = knowledgeBase.buildContext(hits);
+        sources = built.sources;
+
+        systemPromptExtra = `
+Use APENAS as fontes abaixo como base principal da resposta quando forem relevantes.
+Se usar uma fonte, cite no texto como [Fonte 1], [Fonte 2], etc.
+Se a informacao nao estiver nas fontes, diga explicitamente que a base nao cobre esse ponto.
+
+${built.context}
+        `.trim();
+      }
+    } catch (knowledgeErr) {
+      logger.warn(`Falha ao carregar contexto RAG no chat: ${knowledgeErr.message}`);
+    }
+
+    const result = await ai.chat(String(message), systemPromptExtra, safeHistory);
+    res.json({
+      success: true,
+      data: {
+        ...result,
+        sources,
+      },
+    });
   } catch (err) {
     logger.error('Erro no chat:', err.message);
     res.status(500).json({ error: 'Erro na conversa' });
@@ -354,3 +513,4 @@ router.post('/chat', async (req, res) => {
 });
 
 module.exports = router;
+

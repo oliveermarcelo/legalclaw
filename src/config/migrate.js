@@ -80,12 +80,41 @@ const migrations = [
     updated_at TIMESTAMP DEFAULT NOW()
   )`,
 
+  // Base de conhecimento (RAG)
+  `CREATE TABLE IF NOT EXISTS knowledge_sources (
+    id SERIAL PRIMARY KEY,
+    created_by INTEGER REFERENCES users(id),
+    title VARCHAR(500) NOT NULL,
+    source_type VARCHAR(40) DEFAULT 'manual',
+    source_ref VARCHAR(1000),
+    content TEXT NOT NULL,
+    content_hash VARCHAR(64) UNIQUE NOT NULL,
+    metadata JSONB DEFAULT '{}'::jsonb,
+    active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS knowledge_chunks (
+    id SERIAL PRIMARY KEY,
+    source_id INTEGER NOT NULL REFERENCES knowledge_sources(id) ON DELETE CASCADE,
+    chunk_index INTEGER NOT NULL,
+    content TEXT NOT NULL,
+    tokens_est INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE (source_id, chunk_index)
+  )`,
+
   // Índices
   `CREATE INDEX IF NOT EXISTS idx_contracts_user ON contracts(user_id)`,
   `CREATE INDEX IF NOT EXISTS idx_deadlines_user_date ON deadlines(user_id, deadline_date)`,
   `CREATE INDEX IF NOT EXISTS idx_deadlines_status ON deadlines(status, deadline_date)`,
   `CREATE INDEX IF NOT EXISTS idx_diario_alerts_user ON diario_alerts(user_id, notified)`,
   `CREATE INDEX IF NOT EXISTS idx_conversations_remote ON conversations(channel, remote_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_knowledge_sources_created_by ON knowledge_sources(created_by, created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_knowledge_sources_active ON knowledge_sources(active, created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_knowledge_chunks_source ON knowledge_chunks(source_id, chunk_index)`,
+  `CREATE INDEX IF NOT EXISTS idx_knowledge_chunks_tsv ON knowledge_chunks USING GIN (to_tsvector('portuguese', content))`,
 ];
 
 async function migrate() {

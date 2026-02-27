@@ -268,6 +268,36 @@ export async function searchDiario(params) {
   return data.data || data;
 }
 
+// Base de conhecimento (RAG)
+export async function createKnowledgeSource(payload) {
+  const data = await request('/api/knowledge/sources', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  return data.data || data;
+}
+
+export async function listKnowledgeSources(limit = 50) {
+  const data = await request(`/api/knowledge/sources?limit=${limit}`);
+  return data.data || [];
+}
+
+export async function setKnowledgeSourceActive(sourceId, active) {
+  const data = await request(`/api/knowledge/sources/${sourceId}/active`, {
+    method: 'PATCH',
+    body: JSON.stringify({ active }),
+  });
+  return data.data || data;
+}
+
+export async function searchKnowledge(query, limit = 5) {
+  const data = await request('/api/knowledge/search', {
+    method: 'POST',
+    body: JSON.stringify({ query, limit }),
+  });
+  return data.data || [];
+}
+
 // WhatsApp
 export async function getWhatsappStatus() {
   const data = await request('/webhooks/evolution/status');
@@ -294,10 +324,10 @@ export async function getWhatsappQRCode() {
 }
 
 // Chat
-export async function chat(message) {
+export async function chat(message, history = []) {
   const data = await request('/api/chat', {
     method: 'POST',
-    body: JSON.stringify({ message }),
+    body: JSON.stringify({ message, history }),
   });
   return data.data || data;
 }

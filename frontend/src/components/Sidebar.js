@@ -1,6 +1,8 @@
 'use client';
 import { usePathname } from 'next/navigation';
 import {
+  BookOpenText,
+  Bot,
   Clock3,
   FileText,
   LayoutDashboard,
@@ -17,6 +19,8 @@ const NAV_ITEMS = [
   { href: '/contratos', label: 'Contratos', icon: FileText },
   { href: '/prazos', label: 'Prazos', icon: Clock3 },
   { href: '/diarios', label: 'Diarios', icon: Newspaper },
+  { href: '/conhecimento', label: 'Conhecimento', icon: BookOpenText },
+  { href: '/dashboard/chat', label: 'Assistente IA', icon: Bot },
   { href: '/whatsapp', label: 'WhatsApp', icon: MessageCircle },
 ];
 
@@ -40,7 +44,14 @@ export default function Sidebar() {
 
       <nav className="flex-1 px-4 py-6 space-y-2.5">
         {NAV_ITEMS.map((item) => {
-          const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+          const isExact = pathname === item.href;
+          const isNested = pathname.startsWith(`${item.href}/`);
+          const hasMoreSpecificActive = NAV_ITEMS.some((other) => {
+            if (other.href === item.href) return false;
+            if (!other.href.startsWith(`${item.href}/`)) return false;
+            return pathname === other.href || pathname.startsWith(`${other.href}/`);
+          });
+          const active = isExact || (isNested && !hasMoreSpecificActive);
           const Icon = item.icon;
 
           return (
