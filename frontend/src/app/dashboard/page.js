@@ -8,6 +8,7 @@ import {
   FileText,
   FilePenLine,
   Gavel,
+  Link2,
   MessageSquareText,
   Newspaper,
   Search,
@@ -89,6 +90,12 @@ export default function DashboardPage() {
       icon: FilePenLine,
       href: '/fluxos',
       desc: 'Manifestacao, peca, parecer, revisao e analise guiada.',
+    },
+    {
+      label: 'Consultas externas',
+      icon: Link2,
+      href: '/consultas-externas',
+      desc: 'Buscar processo externo por CNJ e acompanhar atualizacao.',
     },
   ];
 

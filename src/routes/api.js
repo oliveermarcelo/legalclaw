@@ -7,6 +7,7 @@ const diarioMonitor = require('../services/diario-monitor');
 const knowledgeBase = require('../services/knowledge-base');
 const ai = require('../services/ai');
 const legalWorkflows = require('../services/legal-workflows');
+const externalLegalSearch = require('../services/external-legal-search');
 const logger = require('../utils/logger');
 
 const router = express.Router();
@@ -485,6 +486,82 @@ router.post('/knowledge/search', async (req, res) => {
 // ============================================================
 // CHAT (IA)
 // ============================================================
+
+// ============================================================
+// CONSULTAS EXTERNAS (SISTEMAS JURIDICOS)
+// ============================================================
+
+/**
+ * GET /api/external/providers/status
+ * Status das integracoes externas juridicas
+ */
+router.get('/external/providers/status', (req, res) => {
+  try {
+    res.json({
+      success: true,
+      data: externalLegalSearch.getProviderStatus(),
+    });
+  } catch (err) {
+    logger.error('Erro ao consultar status de providers externos:', err.message);
+    res.status(500).json({ error: 'Erro ao consultar status de providers externos' });
+  }
+});
+
+/**
+ * POST /api/external/processes/by-cnj
+ * Consulta processo externo por numero CNJ
+ */
+router.post('/external/processes/by-cnj', async (req, res) => {
+  try {
+    const { numeroCnj, includeInvolved, includePublicDocuments } = req.body;
+    const result = await externalLegalSearch.searchProcessByCnj(
+      numeroCnj,
+      { includeInvolved: includeInvolved === true, includePublicDocuments: includePublicDocuments === true },
+      req.user?.userId || null
+    );
+    res.json({ success: true, data: result });
+  } catch (err) {
+    logger.error('Erro na consulta externa por CNJ:', err.message);
+    res.status(400).json({ error: err.message || 'Erro na consulta externa por CNJ' });
+  }
+});
+
+/**
+ * POST /api/external/processes/request-refresh
+ * Solicita atualizacao de processo na base externa
+ */
+router.post('/external/processes/request-refresh', async (req, res) => {
+  try {
+    const { numeroCnj, autos, useCertificate } = req.body;
+    const result = await externalLegalSearch.requestProcessRefresh(
+      numeroCnj,
+      { autos: autos === true, useCertificate: useCertificate === true },
+      req.user?.userId || null
+    );
+    res.json({ success: true, data: result });
+  } catch (err) {
+    logger.error('Erro ao solicitar atualizacao externa:', err.message);
+    res.status(400).json({ error: err.message || 'Erro ao solicitar atualizacao externa' });
+  }
+});
+
+/**
+ * POST /api/external/processes/refresh-status
+ * Consulta status da atualizacao de processo na base externa
+ */
+router.post('/external/processes/refresh-status', async (req, res) => {
+  try {
+    const { numeroCnj } = req.body;
+    const result = await externalLegalSearch.getProcessRefreshStatus(
+      numeroCnj,
+      req.user?.userId || null
+    );
+    res.json({ success: true, data: result });
+  } catch (err) {
+    logger.error('Erro ao consultar status de atualizacao externa:', err.message);
+    res.status(400).json({ error: err.message || 'Erro ao consultar status de atualizacao externa' });
+  }
+});
 
 /**
  * GET /api/workflows/modes

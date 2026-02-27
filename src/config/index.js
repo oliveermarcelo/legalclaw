@@ -19,6 +19,11 @@ function cleanCsv(value, fallback = '') {
     .filter(Boolean);
 }
 
+function cleanBool(value, fallback = false) {
+  const raw = cleanEnv(value, fallback ? '1' : '0').toLowerCase();
+  return raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on';
+}
+
 module.exports = {
   port: parseInt(process.env.PORT || '3000'),
   nodeEnv: process.env.NODE_ENV || 'development',
@@ -65,6 +70,16 @@ module.exports = {
   // Telegram
   telegram: {
     botToken: cleanEnv(process.env.TELEGRAM_BOT_TOKEN),
+  },
+
+  // Consultas externas juridicas
+  externalLegal: {
+    provider: cleanEnv(process.env.EXTERNAL_LEGAL_PROVIDER, 'escavador').toLowerCase(),
+    escavadorEnabled: cleanBool(process.env.ESCAVADOR_ENABLED, false),
+    escavadorApiKey: cleanEnv(process.env.ESCAVADOR_API_KEY),
+    escavadorBaseUrl: cleanUrl(process.env.ESCAVADOR_BASE_URL, 'https://api.escavador.com'),
+    escavadorTimeoutMs: parseInt(process.env.ESCAVADOR_TIMEOUT_MS || '20000', 10),
+    escavadorMaxPerPage: parseInt(process.env.ESCAVADOR_MAX_PER_PAGE || '50', 10),
   },
 
   // JWT

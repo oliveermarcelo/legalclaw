@@ -105,6 +105,19 @@ const migrations = [
     UNIQUE (source_id, chunk_index)
   )`,
 
+  // Logs de consultas externas juridicas
+  `CREATE TABLE IF NOT EXISTS external_query_logs (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id),
+    provider VARCHAR(50) NOT NULL,
+    operation VARCHAR(80) NOT NULL,
+    query_payload JSONB DEFAULT '{}'::jsonb,
+    status VARCHAR(20) NOT NULL,
+    latency_ms INTEGER,
+    error_message TEXT,
+    created_at TIMESTAMP DEFAULT NOW()
+  )`,
+
   // Índices
   `CREATE INDEX IF NOT EXISTS idx_contracts_user ON contracts(user_id)`,
   `CREATE INDEX IF NOT EXISTS idx_deadlines_user_date ON deadlines(user_id, deadline_date)`,
@@ -115,6 +128,8 @@ const migrations = [
   `CREATE INDEX IF NOT EXISTS idx_knowledge_sources_active ON knowledge_sources(active, created_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_knowledge_chunks_source ON knowledge_chunks(source_id, chunk_index)`,
   `CREATE INDEX IF NOT EXISTS idx_knowledge_chunks_tsv ON knowledge_chunks USING GIN (to_tsvector('portuguese', content))`,
+  `CREATE INDEX IF NOT EXISTS idx_external_query_logs_user_date ON external_query_logs(user_id, created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_external_query_logs_provider ON external_query_logs(provider, operation, created_at DESC)`,
 ];
 
 async function migrate() {

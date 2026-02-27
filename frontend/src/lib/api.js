@@ -302,6 +302,36 @@ export async function searchKnowledge(query, limit = 5) {
   return data.data || [];
 }
 
+// Consultas externas juridicas
+export async function getExternalProvidersStatus() {
+  const data = await request('/api/external/providers/status');
+  return data.data || data;
+}
+
+export async function searchExternalProcessByCnj(payload) {
+  const data = await request('/api/external/processes/by-cnj', {
+    method: 'POST',
+    body: JSON.stringify(payload || {}),
+  });
+  return data.data || data;
+}
+
+export async function requestExternalProcessRefresh(payload) {
+  const data = await request('/api/external/processes/request-refresh', {
+    method: 'POST',
+    body: JSON.stringify(payload || {}),
+  });
+  return data.data || data;
+}
+
+export async function getExternalProcessRefreshStatus(payload) {
+  const data = await request('/api/external/processes/refresh-status', {
+    method: 'POST',
+    body: JSON.stringify(payload || {}),
+  });
+  return data.data || data;
+}
+
 // Fluxos juridicos
 export async function getWorkflowModes() {
   const data = await request('/api/workflows/modes');
