@@ -87,14 +87,32 @@ function normalizarDataISO(data) {
 function normalizeHistory(history) {
   if (!Array.isArray(history)) return [];
 
-  return history
+  const cleaned = history
     .filter((item) => item && (item.role === 'user' || item.role === 'assistant'))
     .map((item) => ({
       role: item.role,
       content: String(item.content || '').trim(),
     }))
     .filter((item) => item.content.length > 0)
-    .slice(-12);
+    .slice(-16);
+
+  // Anthropic costuma rejeitar historico iniciado por assistant.
+  while (cleaned.length > 0 && cleaned[0].role !== 'user') {
+    cleaned.shift();
+  }
+
+  // Evita sequencias repetidas da mesma role.
+  const collapsed = [];
+  for (const item of cleaned) {
+    const last = collapsed[collapsed.length - 1];
+    if (last && last.role === item.role) {
+      last.content = `${last.content}\n\n${item.content}`.trim();
+    } else {
+      collapsed.push({ ...item });
+    }
+  }
+
+  return collapsed.slice(-12);
 }
 
 // ============================================================
