@@ -79,6 +79,46 @@ async function evolutionRequest(method, url, { data, params } = {}) {
   throw new Error('Evolution request failed without response');
 }
 
+function extractErrorInfo(err) {
+  return {
+    statusCode: err?.response?.status || err?.statusCode || 0,
+    details: err?.response?.data || err?.details || err?.message || 'unknown_error',
+  };
+}
+
+function normalizeQrPayload(payload) {
+  const candidates = [
+    payload?.base64,
+    payload?.qrcode,
+    payload?.qr,
+    payload?.code,
+    payload?.data?.base64,
+    payload?.data?.qrcode,
+    payload?.data?.qr,
+    payload?.qrcode?.base64,
+    payload?.qrcode?.code,
+  ];
+
+  const qrValue = candidates.find((v) => typeof v === 'string' && v.trim().length > 0);
+  if (!qrValue) {
+    return { raw: payload, qrImage: null, qrText: null };
+  }
+
+  const trimmed = qrValue.trim();
+  const looksLikeDataUrl = trimmed.startsWith('data:image/');
+  const looksLikeBase64 = /^[A-Za-z0-9+/=]+$/.test(trimmed) && trimmed.length > 80;
+
+  return {
+    raw: payload,
+    qrText: looksLikeDataUrl ? null : trimmed,
+    qrImage: looksLikeDataUrl
+      ? trimmed
+      : looksLikeBase64
+        ? `data:image/png;base64,${trimmed}`
+        : null,
+  };
+}
+
 // ============================================================
 // GESTÃO DE INSTÂNCIA
 // ============================================================
@@ -123,13 +163,41 @@ async function createInstance(webhookUrl) {
  * Retorna QR Code para conexão
  */
 async function getQRCode() {
-  try {
-    const response = await evolutionRequest('get', `/instance/connect/${INSTANCE}`);
-    return response.data;
-  } catch (err) {
-    logger.error('Erro ao obter QR Code:', err.message);
-    throw err;
+  const attempts = [
+    { method: 'get', path: `/instance/connect/${INSTANCE}` },
+    { method: 'post', path: `/instance/connect/${INSTANCE}` },
+    { method: 'get', path: `/instance/qrcode/${INSTANCE}` },
+    { method: 'get', path: `/instance/qr/${INSTANCE}` },
+    { method: 'get', path: `/instance/getQrCode/${INSTANCE}` },
+  ];
+
+  let lastError = null;
+
+  for (const attempt of attempts) {
+    try {
+      const response = await evolutionRequest(attempt.method, attempt.path);
+      const normalized = normalizeQrPayload(response.data);
+      return {
+        endpoint: `${attempt.method.toUpperCase()} ${attempt.path}`,
+        ...normalized,
+      };
+    } catch (err) {
+      const info = extractErrorInfo(err);
+      const skippable = info.statusCode === 404 || info.statusCode === 405;
+      if (!skippable) {
+        lastError = { ...info, endpoint: `${attempt.method.toUpperCase()} ${attempt.path}` };
+        break;
+      }
+      lastError = { ...info, endpoint: `${attempt.method.toUpperCase()} ${attempt.path}` };
+    }
   }
+
+  logger.error('Erro ao obter QR Code Evolution:', lastError || {});
+  const error = new Error('Erro ao obter QR Code');
+  error.statusCode = lastError?.statusCode || 0;
+  error.details = lastError?.details || 'qrcode_endpoint_not_found';
+  error.endpoint = lastError?.endpoint || null;
+  throw error;
 }
 
 /**

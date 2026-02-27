@@ -72,7 +72,14 @@ router.get('/evolution/qrcode', async (req, res) => {
     const qr = await evolution.getQRCode();
     res.json({ success: true, data: qr });
   } catch (err) {
-    res.status(500).json({ error: 'Erro ao obter QR Code' });
+    const statusCode = err?.statusCode || err?.response?.status || 502;
+    const details = err?.details || err?.response?.data || err?.message || 'unknown_error';
+    res.status(statusCode === 0 ? 502 : statusCode).json({
+      success: false,
+      error: 'qrcode_unavailable',
+      details,
+      endpoint: err?.endpoint || null,
+    });
   }
 });
 
