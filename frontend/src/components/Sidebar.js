@@ -5,6 +5,7 @@ import {
   FileText,
   LayoutDashboard,
   LogOut,
+  MessageCircle,
   Newspaper,
   Scale,
   ShieldCheck,
@@ -16,6 +17,7 @@ const NAV_ITEMS = [
   { href: '/contratos', label: 'Contratos', icon: FileText },
   { href: '/prazos', label: 'Prazos', icon: Clock3 },
   { href: '/diarios', label: 'Diarios', icon: Newspaper },
+  { href: '/whatsapp', label: 'WhatsApp', icon: MessageCircle },
 ];
 
 export default function Sidebar() {

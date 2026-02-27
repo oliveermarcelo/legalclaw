@@ -212,6 +212,31 @@ export async function searchDiario(params) {
   return data.data || data;
 }
 
+// WhatsApp
+export async function getWhatsappStatus() {
+  const data = await request('/webhooks/evolution/status');
+  const state = data?.data?.instance?.state || data?.data?.state || 'unknown';
+
+  return {
+    ...data,
+    state,
+  };
+}
+
+export async function getWhatsappQRCode() {
+  const data = await request('/webhooks/evolution/qrcode');
+  const qrImage = data?.data?.qrImage || data?.data?.raw?.base64 || null;
+  const qrText = data?.data?.qrText || data?.data?.raw?.code || null;
+  const endpoint = data?.data?.endpoint || null;
+
+  return {
+    ...data,
+    qrImage,
+    qrText,
+    endpoint,
+  };
+}
+
 // Chat
 export async function chat(message) {
   const data = await request('/api/chat', {
