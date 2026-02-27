@@ -12,6 +12,7 @@ const authRoutes = require('./routes/auth');
 const apiRoutes = require('./routes/api');
 const webhookRoutes = require('./routes/webhooks');
 const evolution = require('./integrations/evolution');
+const ai = require('./services/ai');
 
 const app = express();
 const HEALTHCHECK_TIMEOUT_MS = Number(process.env.HEALTHCHECK_TIMEOUT_MS || 1500);
@@ -92,17 +93,7 @@ app.get('/health', async (req, res) => {
     }
   })();
 
-  const aiProvider = (config.ai.provider || '').toLowerCase();
-  const aiSupported = aiProvider === 'anthropic' || aiProvider === 'gemini' || aiProvider === 'openai';
-  const aiConfigured =
-    (aiProvider === 'anthropic' && Boolean(config.ai.anthropicApiKey)) ||
-    (aiProvider === 'gemini' && Boolean(config.ai.geminiApiKey)) ||
-    (aiProvider === 'openai' && Boolean(config.ai.openaiApiKey));
-  checks.ai = !aiSupported
-    ? `${aiProvider || 'unknown'}:unsupported`
-    : aiConfigured
-      ? `${aiProvider}:configured`
-      : `${aiProvider}:not_configured`;
+  checks.ai = ai.getStatus();
 
   const whatsappCheck = withTimeout(evolution.getConnectionStatus(), HEALTHCHECK_TIMEOUT_MS)
     .then((status) => {

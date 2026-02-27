@@ -3,6 +3,7 @@ const config = require('../config');
 const logger = require('../utils/logger');
 
 let anthropicClient = null;
+let anthropicApiKey = null;
 let geminiApiKey = null;
 let openaiApiKey = null;
 let openaiBaseUrl = '';
@@ -11,12 +12,13 @@ let openaiBaseUrl = '';
 const provider = config.ai.provider; // 'anthropic', 'gemini' ou 'openai'
 
 if (provider === 'anthropic' && config.ai.anthropicApiKey) {
+  anthropicApiKey = config.ai.anthropicApiKey;
   try {
     const Anthropic = require('@anthropic-ai/sdk');
     anthropicClient = new Anthropic({ apiKey: config.ai.anthropicApiKey });
     logger.info('IA: Usando Anthropic Claude');
-  } catch {
-    logger.error('IA: @anthropic-ai/sdk nao instalado. Rode: npm install @anthropic-ai/sdk');
+  } catch (err) {
+    logger.warn(`IA: SDK Anthropic indisponivel (${err.message}). Usando chamada HTTP direta.`);
   }
 } else if (provider === 'openai' && config.ai.openaiApiKey) {
   openaiApiKey = config.ai.openaiApiKey;
@@ -61,23 +63,58 @@ async function chatAnthropic(userMessage, systemPromptExtra, conversationHistory
     { role: 'user', content: userMessage },
   ];
 
-  const response = await anthropicClient.messages.create({
-    model: config.ai.anthropicModel,
-    max_tokens: config.ai.maxTokens,
-    system: systemPrompt,
-    messages,
-  });
+  if (anthropicClient) {
+    const response = await anthropicClient.messages.create({
+      model: config.ai.anthropicModel,
+      max_tokens: config.ai.maxTokens,
+      system: systemPrompt,
+      messages,
+    });
 
-  const text = response.content
-    .filter((block) => block.type === 'text')
-    .map((block) => block.text)
-    .join('\n');
+    const text = response.content
+      .filter((block) => block.type === 'text')
+      .map((block) => block.text)
+      .join('\n');
+
+    return {
+      text,
+      usage: {
+        input: response.usage.input_tokens,
+        output: response.usage.output_tokens,
+      },
+    };
+  }
+
+  const response = await axios.post(
+    'https://api.anthropic.com/v1/messages',
+    {
+      model: config.ai.anthropicModel,
+      max_tokens: config.ai.maxTokens,
+      system: systemPrompt,
+      messages,
+    },
+    {
+      headers: {
+        'x-api-key': anthropicApiKey,
+        'anthropic-version': '2023-06-01',
+        'Content-Type': 'application/json',
+      },
+      timeout: 60000,
+    }
+  );
+
+  const text = response.data?.content
+    ?.filter((block) => block.type === 'text')
+    ?.map((block) => block.text)
+    ?.join('\n') || '';
+
+  const usage = response.data?.usage || {};
 
   return {
     text,
     usage: {
-      input: response.usage.input_tokens,
-      output: response.usage.output_tokens,
+      input: usage.input_tokens || 0,
+      output: usage.output_tokens || 0,
     },
   };
 }
@@ -226,12 +263,29 @@ function mapProviderError(err) {
   return `Falha no provider ${provider}: ${err?.message || 'erro desconhecido'}`;
 }
 
+function getStatus() {
+  if (provider === 'anthropic') {
+    if (!anthropicApiKey) return 'anthropic:not_configured';
+    return anthropicClient ? 'anthropic:configured' : 'anthropic:http_fallback';
+  }
+
+  if (provider === 'openai') {
+    return openaiApiKey ? 'openai:configured' : 'openai:not_configured';
+  }
+
+  if (provider === 'gemini') {
+    return geminiApiKey ? 'gemini:configured' : 'gemini:not_configured';
+  }
+
+  return `${provider || 'unknown'}:unsupported`;
+}
+
 /**
  * Envia mensagem para a IA e retorna a resposta
  */
 async function chat(userMessage, systemPromptExtra = '', conversationHistory = []) {
   try {
-    if (provider === 'anthropic' && anthropicClient) {
+    if (provider === 'anthropic' && anthropicApiKey) {
       return await chatAnthropic(userMessage, systemPromptExtra, conversationHistory);
     } else if (provider === 'openai' && openaiApiKey) {
       return await chatOpenAI(userMessage, systemPromptExtra, conversationHistory);
@@ -264,4 +318,4 @@ async function analyzeStructured(userMessage, systemPromptExtra = '') {
   }
 }
 
-module.exports = { chat, analyzeStructured, SYSTEM_PROMPT_BASE };
+module.exports = { chat, analyzeStructured, SYSTEM_PROMPT_BASE, getStatus };

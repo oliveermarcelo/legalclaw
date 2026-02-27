@@ -72,13 +72,14 @@ export default function DashboardChatPage() {
       };
       setMessages((prev) => [...prev, assistantMessage]);
     } catch (err) {
-      setFatalError(err.message || 'Erro ao conversar com o assistente');
+      const errorMessage = err?.message || 'Erro ao conversar com o assistente';
+      setFatalError(errorMessage);
       setMessages((prev) => [
         ...prev,
         {
           id: `assistant-error-${Date.now()}`,
           role: 'assistant',
-          content: 'Nao foi possivel responder agora. Tente novamente em instantes.',
+          content: `Nao foi possivel responder agora: ${errorMessage}`,
           sources: [],
         },
       ]);
