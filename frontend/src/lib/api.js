@@ -111,15 +111,18 @@ export function isAuthenticated() {
 }
 
 // Contratos
-export async function analyzeContract(text, title) {
+export async function analyzeContract(text, title, model = '') {
+  const payload = { text, title };
+  if (model) payload.model = model;
+
   const data = await request('/api/contracts/analyze', {
     method: 'POST',
-    body: JSON.stringify({ text, title }),
+    body: JSON.stringify(payload),
   });
   return data.data || data;
 }
 
-export async function analyzeContractPdf(file, title) {
+export async function analyzeContractPdf(file, title, model = '') {
   if (!file) throw new Error('Arquivo PDF nao informado');
 
   const token = getToken();
@@ -128,6 +131,7 @@ export async function analyzeContractPdf(file, title) {
   const formData = new FormData();
   formData.append('file', file);
   if (title) formData.append('title', title);
+  if (model) formData.append('model', model);
 
   const controller = new AbortController();
   const timeoutMs = 30000;
@@ -324,10 +328,22 @@ export async function getWhatsappQRCode() {
 }
 
 // Chat
-export async function chat(message, history = []) {
+export async function getChatModels() {
+  const data = await request('/api/chat/models');
+  return data.data || data;
+}
+
+export async function chat(message, history = [], model = '') {
+  const payload = {
+    message,
+    history,
+  };
+
+  if (model) payload.model = model;
+
   const data = await request('/api/chat', {
     method: 'POST',
-    body: JSON.stringify({ message, history }),
+    body: JSON.stringify(payload),
   });
   return data.data || data;
 }

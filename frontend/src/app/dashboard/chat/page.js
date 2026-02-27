@@ -9,7 +9,7 @@ import {
   MessageSquareText,
   Sparkles,
 } from 'lucide-react';
-import { chat as chatApi } from '@/lib/api';
+import { chat as chatApi, getChatModels } from '@/lib/api';
 
 function normalizeHistory(messages) {
   return messages
@@ -34,9 +34,40 @@ export default function DashboardChatPage() {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [fatalError, setFatalError] = useState('');
+  const [provider, setProvider] = useState('');
+  const [model, setModel] = useState('');
+  const [modelOptions, setModelOptions] = useState([]);
   const viewportRef = useRef(null);
 
   const canSend = useMemo(() => input.trim().length > 0 && !sending, [input, sending]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadModels() {
+      try {
+        const data = await getChatModels();
+        const options = Array.isArray(data?.models) ? data.models : [];
+        const fallback = options[0] || '';
+        if (!active) return;
+
+        setProvider(data?.provider || '');
+        setModelOptions(options);
+        setModel(data?.defaultModel || fallback);
+      } catch {
+        if (!active) return;
+        // Fallback local para manter o chat utilizavel mesmo sem endpoint de modelos.
+        setProvider('openai');
+        setModelOptions(['gpt-4o-mini', 'gpt-4o']);
+        setModel('gpt-4o-mini');
+      }
+    }
+
+    loadModels();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!viewportRef.current) return;
@@ -63,7 +94,7 @@ export default function DashboardChatPage() {
     setSending(true);
 
     try {
-      const response = await chatApi(question, normalizeHistory(nextMessages));
+      const response = await chatApi(question, normalizeHistory(nextMessages), model);
       const assistantMessage = {
         id: `assistant-${Date.now()}`,
         role: 'assistant',
@@ -168,30 +199,52 @@ export default function DashboardChatPage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="flex flex-col md:flex-row gap-3">
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              className="input-field flex-1"
-              placeholder="Digite sua pergunta juridica..."
-            />
-            <button
-              type="submit"
-              disabled={!canSend}
-              className="btn-primary inline-flex items-center justify-center gap-2 md:min-w-[180px]"
-            >
-              {sending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2.2} />
-                  Enviando...
-                </>
-              ) : (
-                <>
-                  <ArrowRight className="h-4 w-4" strokeWidth={2.2} />
-                  Enviar pergunta
-                </>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+            <div className="flex flex-col md:flex-row md:items-center gap-3">
+              <div className="w-full md:max-w-xs">
+                <select
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  className="input-field"
+                  disabled={sending || modelOptions.length === 0}
+                >
+                  {modelOptions.map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+              </div>
+              {provider && (
+                <p className="text-xs text-surface-500">
+                  Provider ativo: <span className="font-semibold text-surface-700">{provider}</span>
+                </p>
               )}
-            </button>
+            </div>
+
+            <div className="flex flex-col md:flex-row gap-3">
+              <input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                className="input-field flex-1"
+                placeholder="Digite sua pergunta juridica..."
+              />
+              <button
+                type="submit"
+                disabled={!canSend}
+                className="btn-primary inline-flex items-center justify-center gap-2 md:min-w-[180px]"
+              >
+                {sending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2.2} />
+                    Enviando...
+                  </>
+                ) : (
+                  <>
+                    <ArrowRight className="h-4 w-4" strokeWidth={2.2} />
+                    Enviar pergunta
+                  </>
+                )}
+              </button>
+            </div>
           </form>
 
           <p className="mt-3 text-xs text-surface-400 inline-flex items-center gap-1.5">

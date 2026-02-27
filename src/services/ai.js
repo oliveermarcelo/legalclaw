@@ -49,11 +49,53 @@ Regras:
 - Quando nao souber, diga claramente
 - Respostas em portugues brasileiro`;
 
+function uniqueModels(models) {
+  return [...new Set((models || []).map((item) => String(item || '').trim()).filter(Boolean))];
+}
+
+function getDefaultModel() {
+  if (provider === 'openai') return config.ai.openaiModel;
+  if (provider === 'anthropic') return config.ai.anthropicModel;
+  if (provider === 'gemini') return config.ai.geminiModel;
+  return '';
+}
+
+function getAvailableModels() {
+  if (provider === 'openai') {
+    return uniqueModels([...(config.ai.openaiAllowedModels || []), config.ai.openaiModel]);
+  }
+  if (provider === 'anthropic') {
+    return uniqueModels([...(config.ai.anthropicAllowedModels || []), config.ai.anthropicModel]);
+  }
+  if (provider === 'gemini') {
+    return uniqueModels([...(config.ai.geminiAllowedModels || []), config.ai.geminiModel]);
+  }
+  return [];
+}
+
+function resolveModel(requestedModel) {
+  const defaultModel = getDefaultModel();
+  const availableModels = getAvailableModels();
+  const normalized = String(requestedModel || '').trim();
+
+  if (!normalized) {
+    return defaultModel;
+  }
+
+  if (!availableModels.includes(normalized)) {
+    throw new Error(
+      `Modelo "${normalized}" nao permitido para ${provider}. Modelos permitidos: ${availableModels.join(', ')}`
+    );
+  }
+
+  return normalized;
+}
+
 // ============================================================
 // ANTHROPIC CLAUDE
 // ============================================================
 
-async function chatAnthropic(userMessage, systemPromptExtra, conversationHistory) {
+async function chatAnthropic(userMessage, systemPromptExtra, conversationHistory, model) {
   const systemPrompt = systemPromptExtra
     ? `${SYSTEM_PROMPT_BASE}\n\n${systemPromptExtra}`
     : SYSTEM_PROMPT_BASE;
@@ -65,7 +107,7 @@ async function chatAnthropic(userMessage, systemPromptExtra, conversationHistory
 
   if (anthropicClient) {
     const response = await anthropicClient.messages.create({
-      model: config.ai.anthropicModel,
+      model,
       max_tokens: config.ai.maxTokens,
       system: systemPrompt,
       messages,
@@ -78,6 +120,7 @@ async function chatAnthropic(userMessage, systemPromptExtra, conversationHistory
 
     return {
       text,
+      model,
       usage: {
         input: response.usage.input_tokens,
         output: response.usage.output_tokens,
@@ -88,7 +131,7 @@ async function chatAnthropic(userMessage, systemPromptExtra, conversationHistory
   const response = await axios.post(
     'https://api.anthropic.com/v1/messages',
     {
-      model: config.ai.anthropicModel,
+      model,
       max_tokens: config.ai.maxTokens,
       system: systemPrompt,
       messages,
@@ -112,6 +155,7 @@ async function chatAnthropic(userMessage, systemPromptExtra, conversationHistory
 
   return {
     text,
+    model,
     usage: {
       input: usage.input_tokens || 0,
       output: usage.output_tokens || 0,
@@ -123,7 +167,7 @@ async function chatAnthropic(userMessage, systemPromptExtra, conversationHistory
 // OPENAI
 // ============================================================
 
-async function chatOpenAI(userMessage, systemPromptExtra, conversationHistory) {
+async function chatOpenAI(userMessage, systemPromptExtra, conversationHistory, model) {
   const systemPrompt = systemPromptExtra
     ? `${SYSTEM_PROMPT_BASE}\n\n${systemPromptExtra}`
     : SYSTEM_PROMPT_BASE;
@@ -140,7 +184,7 @@ async function chatOpenAI(userMessage, systemPromptExtra, conversationHistory) {
   const response = await axios.post(
     `${openaiBaseUrl}/chat/completions`,
     {
-      model: config.ai.openaiModel,
+      model,
       messages,
       temperature: 0.7,
       max_tokens: config.ai.maxTokens,
@@ -159,6 +203,7 @@ async function chatOpenAI(userMessage, systemPromptExtra, conversationHistory) {
 
   return {
     text,
+    model,
     usage: {
       input: usage.prompt_tokens || 0,
       output: usage.completion_tokens || 0,
@@ -170,7 +215,7 @@ async function chatOpenAI(userMessage, systemPromptExtra, conversationHistory) {
 // GOOGLE GEMINI
 // ============================================================
 
-async function chatGemini(userMessage, systemPromptExtra, conversationHistory) {
+async function chatGemini(userMessage, systemPromptExtra, conversationHistory, model) {
   const systemPrompt = systemPromptExtra
     ? `${SYSTEM_PROMPT_BASE}\n\n${systemPromptExtra}`
     : SYSTEM_PROMPT_BASE;
@@ -191,7 +236,7 @@ async function chatGemini(userMessage, systemPromptExtra, conversationHistory) {
   });
 
   const response = await axios.post(
-    `https://generativelanguage.googleapis.com/v1beta/models/${config.ai.geminiModel}:generateContent?key=${geminiApiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`,
     {
       system_instruction: {
         parts: [{ text: systemPrompt }],
@@ -216,6 +261,7 @@ async function chatGemini(userMessage, systemPromptExtra, conversationHistory) {
 
   return {
     text,
+    model,
     usage: {
       input: usage.promptTokenCount || 0,
       output: usage.candidatesTokenCount || 0,
@@ -280,17 +326,27 @@ function getStatus() {
   return `${provider || 'unknown'}:unsupported`;
 }
 
+function getModelConfig() {
+  return {
+    provider,
+    defaultModel: getDefaultModel(),
+    availableModels: getAvailableModels(),
+  };
+}
+
 /**
  * Envia mensagem para a IA e retorna a resposta
  */
-async function chat(userMessage, systemPromptExtra = '', conversationHistory = []) {
+async function chat(userMessage, systemPromptExtra = '', conversationHistory = [], options = {}) {
   try {
+    const model = resolveModel(options?.model);
+
     if (provider === 'anthropic' && anthropicApiKey) {
-      return await chatAnthropic(userMessage, systemPromptExtra, conversationHistory);
+      return await chatAnthropic(userMessage, systemPromptExtra, conversationHistory, model);
     } else if (provider === 'openai' && openaiApiKey) {
-      return await chatOpenAI(userMessage, systemPromptExtra, conversationHistory);
+      return await chatOpenAI(userMessage, systemPromptExtra, conversationHistory, model);
     } else if (provider === 'gemini' && geminiApiKey) {
-      return await chatGemini(userMessage, systemPromptExtra, conversationHistory);
+      return await chatGemini(userMessage, systemPromptExtra, conversationHistory, model);
     }
 
     throw new Error('Nenhum provider de IA configurado');
@@ -304,10 +360,10 @@ async function chat(userMessage, systemPromptExtra = '', conversationHistory = [
 /**
  * Analise estruturada com JSON (para uso interno)
  */
-async function analyzeStructured(userMessage, systemPromptExtra = '') {
+async function analyzeStructured(userMessage, systemPromptExtra = '', options = {}) {
   const jsonInstruction = '\n\nResponda EXCLUSIVAMENTE em JSON valido, sem markdown, sem backticks, sem texto antes ou depois.';
 
-  const result = await chat(userMessage, (systemPromptExtra || '') + jsonInstruction);
+  const result = await chat(userMessage, (systemPromptExtra || '') + jsonInstruction, [], options);
 
   try {
     const cleaned = result.text.replace(/```json\s?|```/g, '').trim();
@@ -318,4 +374,10 @@ async function analyzeStructured(userMessage, systemPromptExtra = '') {
   }
 }
 
-module.exports = { chat, analyzeStructured, SYSTEM_PROMPT_BASE, getStatus };
+module.exports = {
+  chat,
+  analyzeStructured,
+  SYSTEM_PROMPT_BASE,
+  getStatus,
+  getModelConfig,
+};

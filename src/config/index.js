@@ -12,6 +12,13 @@ function cleanUrl(value, fallback = '') {
   return /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
 }
 
+function cleanCsv(value, fallback = '') {
+  return cleanEnv(value, fallback)
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 module.exports = {
   port: parseInt(process.env.PORT || '3000'),
   nodeEnv: process.env.NODE_ENV || 'development',
@@ -22,13 +29,16 @@ module.exports = {
     // OpenAI
     openaiApiKey: cleanEnv(process.env.OPENAI_API_KEY),
     openaiModel: cleanEnv(process.env.OPENAI_MODEL, 'gpt-4o-mini'),
+    openaiAllowedModels: cleanCsv(process.env.OPENAI_ALLOWED_MODELS, 'gpt-4o-mini,gpt-4o'),
     openaiBaseUrl: cleanUrl(process.env.OPENAI_BASE_URL, 'https://api.openai.com/v1'),
     // Gemini
     geminiApiKey: cleanEnv(process.env.GEMINI_API_KEY),
     geminiModel: cleanEnv(process.env.GEMINI_MODEL, 'gemini-2.0-flash'),
+    geminiAllowedModels: cleanCsv(process.env.GEMINI_ALLOWED_MODELS, 'gemini-2.0-flash'),
     // Anthropic
     anthropicApiKey: cleanEnv(process.env.ANTHROPIC_API_KEY),
     anthropicModel: cleanEnv(process.env.ANTHROPIC_MODEL, 'claude-sonnet-4-20250514'),
+    anthropicAllowedModels: cleanCsv(process.env.ANTHROPIC_ALLOWED_MODELS, 'claude-sonnet-4-20250514'),
     // Geral
     maxTokens: parseInt(process.env.AI_MAX_TOKENS || '4096'),
   },

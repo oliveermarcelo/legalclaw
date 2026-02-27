@@ -94,6 +94,7 @@ app.get('/health', async (req, res) => {
   })();
 
   checks.ai = ai.getStatus();
+  checks.ai_model = ai.getModelConfig().defaultModel || 'unknown';
 
   const whatsappCheck = withTimeout(evolution.getConnectionStatus(), HEALTHCHECK_TIMEOUT_MS)
     .then((status) => {

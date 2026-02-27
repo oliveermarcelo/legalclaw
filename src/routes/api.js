@@ -125,12 +125,12 @@ function normalizeHistory(history) {
  */
 router.post('/contracts/analyze', async (req, res) => {
   try {
-    const { text, userId, title } = req.body;
+    const { text, userId, title, model } = req.body;
     const resolvedUserId = req.user?.userId || userId || null;
     if (!text || text.length < 50) {
       return res.status(400).json({ error: 'Texto do contrato muito curto (mínimo 50 caracteres)' });
     }
-    const result = await contractAnalyzer.analyze(text, resolvedUserId, title || '');
+    const result = await contractAnalyzer.analyze(text, resolvedUserId, title || '', { model });
     res.json({ success: true, data: result });
   } catch (err) {
     logger.error('Erro na análise de contrato:', err.message);
@@ -157,7 +157,12 @@ router.post('/contracts/analyze/pdf', uploadPdfMiddleware, async (req, res) => {
     }
 
     const title = req.body.title || req.file.originalname || 'Contrato PDF';
-    const result = await contractAnalyzer.analyze(extractedText, resolvedUserId, title);
+    const result = await contractAnalyzer.analyze(
+      extractedText,
+      resolvedUserId,
+      title,
+      { model: req.body.model }
+    );
 
     res.json({
       success: true,
@@ -481,12 +486,33 @@ router.post('/knowledge/search', async (req, res) => {
 // ============================================================
 
 /**
+ * GET /api/chat/models
+ * Lista modelos disponiveis para o provider atual
+ */
+router.get('/chat/models', (req, res) => {
+  try {
+    const modelConfig = ai.getModelConfig();
+    res.json({
+      success: true,
+      data: {
+        provider: modelConfig.provider,
+        defaultModel: modelConfig.defaultModel,
+        models: modelConfig.availableModels,
+      },
+    });
+  } catch (err) {
+    logger.error('Erro ao listar modelos de chat:', err.message);
+    res.status(500).json({ error: 'Erro ao listar modelos de chat' });
+  }
+});
+
+/**
  * POST /api/chat
  * Conversa direta com o assistente
  */
 router.post('/chat', async (req, res) => {
   try {
-    const { message, history } = req.body;
+    const { message, history, model } = req.body;
     if (!message) return res.status(400).json({ error: 'message e obrigatorio' });
 
     const safeHistory = normalizeHistory(history);
@@ -516,7 +542,7 @@ ${built.context}
       logger.warn(`Falha ao carregar contexto RAG no chat: ${knowledgeErr.message}`);
     }
 
-    const result = await ai.chat(String(message), systemPromptExtra, safeHistory);
+    const result = await ai.chat(String(message), systemPromptExtra, safeHistory, { model });
     res.json({
       success: true,
       data: {
