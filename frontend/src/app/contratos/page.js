@@ -4,13 +4,14 @@ import {
   AlertTriangle,
   FileSearch,
   FileText,
+  FileUp,
   Gavel,
   History,
   Loader2,
   ShieldAlert,
   Sparkles,
 } from 'lucide-react';
-import { analyzeContract, getContracts } from '@/lib/api';
+import { analyzeContract, analyzeContractPdf, getContracts } from '@/lib/api';
 
 const TABS = [
   { id: 'analyze', label: 'Analisar', icon: Gavel },
@@ -42,7 +43,9 @@ function formatDateSafe(dateValue, fallback = '-') {
 
 export default function ContratosPage() {
   const [tab, setTab] = useState('analyze');
+  const [inputMode, setInputMode] = useState('text');
   const [text, setText] = useState('');
+  const [pdfFile, setPdfFile] = useState(null);
   const [title, setTitle] = useState('');
   const [result, setResult] = useState(null);
   const [contracts, setContracts] = useState([]);
@@ -58,12 +61,20 @@ export default function ContratosPage() {
 
   async function handleAnalyze(e) {
     e.preventDefault();
-    if (!text.trim()) return;
+    if (inputMode === 'text' && !text.trim()) return;
+    if (inputMode === 'pdf' && !pdfFile) {
+      setResult({ error: 'Selecione um arquivo PDF para analisar.' });
+      return;
+    }
+
     setLoading(true);
     setResult(null);
 
     try {
-      const data = await analyzeContract(text, title || 'Sem titulo');
+      const data = inputMode === 'pdf'
+        ? await analyzeContractPdf(pdfFile, title || pdfFile?.name || 'Contrato PDF')
+        : await analyzeContract(text, title || 'Sem titulo');
+
       setResult(data);
       getContracts().then(setContracts).catch(() => {});
     } catch (err) {
@@ -114,10 +125,37 @@ export default function ContratosPage() {
           <section className="rounded-3xl border border-surface-200/80 bg-white p-6 shadow-sm">
             <h3 className="font-display text-2xl text-surface-900 mb-1">Analisar contrato</h3>
             <p className="text-sm text-surface-400 mb-5">
-              Cole o texto para revisar riscos, pontos criticos e sugestoes de melhoria.
+              Revise riscos, pontos criticos e sugestoes de melhoria por texto ou PDF.
             </p>
 
             <form onSubmit={handleAnalyze} className="space-y-4">
+              <div className="inline-flex gap-1 rounded-xl border border-surface-200 bg-surface-50 p-1">
+                <button
+                  type="button"
+                  onClick={() => setInputMode('text')}
+                  className={[
+                    'rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors',
+                    inputMode === 'text'
+                      ? 'bg-brand-700 text-white'
+                      : 'text-surface-600 hover:text-surface-900',
+                  ].join(' ')}
+                >
+                  Texto
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInputMode('pdf')}
+                  className={[
+                    'rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors',
+                    inputMode === 'pdf'
+                      ? 'bg-brand-700 text-white'
+                      : 'text-surface-600 hover:text-surface-900',
+                  ].join(' ')}
+                >
+                  PDF
+                </button>
+              </div>
+
               <input
                 type="text"
                 value={title}
@@ -125,13 +163,37 @@ export default function ContratosPage() {
                 className="input-field"
                 placeholder="Titulo do contrato (opcional)"
               />
-              <textarea
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                className="input-field min-h-[320px] resize-y font-mono text-sm"
-                placeholder="Cole o texto do contrato aqui."
-                required
-              />
+
+              {inputMode === 'text' ? (
+                <textarea
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  className="input-field min-h-[320px] resize-y font-mono text-sm"
+                  placeholder="Cole o texto do contrato aqui."
+                  required
+                />
+              ) : (
+                <div className="rounded-2xl border border-surface-200 bg-surface-50 p-4">
+                  <label className="block text-sm font-medium text-surface-700 mb-2">
+                    Arquivo PDF do contrato
+                  </label>
+                  <input
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
+                    className="block w-full text-sm text-surface-700 file:mr-4 file:rounded-lg file:border-0 file:bg-brand-700 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-brand-800"
+                    required
+                  />
+                  <p className="text-xs text-surface-400 mt-2">
+                    Limite de 10MB por arquivo.
+                  </p>
+                  {pdfFile && (
+                    <p className="mt-2 text-xs text-surface-600">
+                      Arquivo selecionado: <span className="font-semibold">{pdfFile.name}</span>
+                    </p>
+                  )}
+                </div>
+              )}
 
               <button type="submit" disabled={loading} className="btn-primary w-full inline-flex items-center justify-center gap-2">
                 {loading ? (
@@ -141,8 +203,12 @@ export default function ContratosPage() {
                   </>
                 ) : (
                   <>
-                    <FileSearch className="h-4 w-4" strokeWidth={2.2} />
-                    Analisar contrato
+                    {inputMode === 'pdf' ? (
+                      <FileUp className="h-4 w-4" strokeWidth={2.2} />
+                    ) : (
+                      <FileSearch className="h-4 w-4" strokeWidth={2.2} />
+                    )}
+                    {inputMode === 'pdf' ? 'Analisar PDF' : 'Analisar contrato'}
                   </>
                 )}
               </button>
@@ -172,6 +238,51 @@ export default function ContratosPage() {
               <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-red-700 text-sm inline-flex items-start gap-2">
                 <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" strokeWidth={2.2} />
                 <span>{result.error}</span>
+              </div>
+            ) : result?.analysis ? (
+              <div className="space-y-4">
+                {(result.riskLevel || result.analysis?.risk_level) && (
+                  <div>
+                    <span className={`badge ${getRiskBadgeClass(result.riskLevel || result.analysis?.risk_level)}`}>
+                      Risco: {result.riskLevel || result.analysis?.risk_level}
+                    </span>
+                  </div>
+                )}
+
+                {typeof result.analysis?.score === 'number' && (
+                  <div className="rounded-2xl border border-surface-200 bg-surface-50 p-4">
+                    <p className="text-sm text-surface-500">Score de seguranca</p>
+                    <p className="text-2xl font-bold text-surface-900">{result.analysis.score}/10</p>
+                  </div>
+                )}
+
+                {Array.isArray(result.analysis?.clausulas_risco) && result.analysis.clausulas_risco.length > 0 && (
+                  <div className="rounded-2xl border border-surface-200 bg-white p-4">
+                    <p className="text-sm font-semibold text-surface-800 mb-3">Clausulas de risco</p>
+                    <div className="space-y-3 max-h-80 overflow-auto pr-1">
+                      {result.analysis.clausulas_risco.slice(0, 6).map((item, idx) => (
+                        <div key={`${item.clausula || 'clausula'}-${idx}`} className="rounded-xl border border-surface-200 bg-surface-50 p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-sm font-semibold text-surface-800">{item.clausula || `Clausula ${idx + 1}`}</p>
+                            {item.risco && (
+                              <span className={`badge ${getRiskBadgeClass(item.risco)}`}>{item.risco}</span>
+                            )}
+                          </div>
+                          {item.explicacao && (
+                            <p className="text-xs text-surface-600 mt-2">{item.explicacao}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {result.analysis?.recomendacao && (
+                  <div className="rounded-2xl border border-brand-200 bg-brand-50 p-4 text-sm text-brand-900">
+                    <p className="font-semibold mb-1">Recomendacao final</p>
+                    <p>{result.analysis.recomendacao}</p>
+                  </div>
+                )}
               </div>
             ) : result?.text ? (
               <div>

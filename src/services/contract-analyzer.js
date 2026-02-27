@@ -31,7 +31,7 @@ Responda em JSON com esta estrutura:
 /**
  * Analisa um contrato e salva no banco
  */
-async function analyze(contractText, userId = null) {
+async function analyze(contractText, userId = null, title = '') {
   logger.info('Iniciando análise de contrato', { userId, textLength: contractText.length });
 
   const result = await ai.analyzeStructured(
@@ -57,7 +57,7 @@ async function analyze(contractText, userId = null) {
          VALUES ($1, $2, $3, $4, $5, 'completed') RETURNING id`,
         [
           userId,
-          result.parsed?.resumo?.tipo || 'Contrato',
+          title || result.parsed?.resumo?.tipo || 'Contrato',
           contractText.substring(0, 10000), // limitar tamanho
           JSON.stringify(result.parsed || { raw: result.text }),
           riskLevel,

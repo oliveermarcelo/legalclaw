@@ -1,4 +1,6 @@
 const express = require('express');
+const multer = require('multer');
+const pdfParse = require('pdf-parse');
 const contractAnalyzer = require('../services/contract-analyzer');
 const deadlineManager = require('../services/deadline-manager');
 const diarioMonitor = require('../services/diario-monitor');
@@ -6,6 +8,37 @@ const ai = require('../services/ai');
 const logger = require('../utils/logger');
 
 const router = express.Router();
+const uploadPdf = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype !== 'application/pdf') {
+      cb(new Error('Apenas arquivos PDF sao permitidos'));
+      return;
+    }
+    cb(null, true);
+  },
+});
+
+function uploadPdfMiddleware(req, res, next) {
+  uploadPdf.single('file')(req, res, (err) => {
+    if (!err) {
+      next();
+      return;
+    }
+
+    if (err instanceof multer.MulterError) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        res.status(400).json({ error: 'PDF excede o limite de 10MB' });
+        return;
+      }
+      res.status(400).json({ error: err.message || 'Falha no upload do PDF' });
+      return;
+    }
+
+    res.status(400).json({ error: err.message || 'Falha no upload do PDF' });
+  });
+}
 
 function formatarDataISO(date) {
   const ano = String(date.getFullYear());
@@ -60,11 +93,12 @@ function normalizarDataISO(data) {
  */
 router.post('/contracts/analyze', async (req, res) => {
   try {
-    const { text, userId } = req.body;
+    const { text, userId, title } = req.body;
+    const resolvedUserId = req.user?.userId || userId || null;
     if (!text || text.length < 50) {
       return res.status(400).json({ error: 'Texto do contrato muito curto (mínimo 50 caracteres)' });
     }
-    const result = await contractAnalyzer.analyze(text, userId || null);
+    const result = await contractAnalyzer.analyze(text, resolvedUserId, title || '');
     res.json({ success: true, data: result });
   } catch (err) {
     logger.error('Erro na análise de contrato:', err.message);
@@ -73,8 +107,45 @@ router.post('/contracts/analyze', async (req, res) => {
 });
 
 /**
+ * POST /api/contracts/analyze/pdf
+ * Analisa um contrato em PDF (multipart/form-data, campo "file")
+ */
+router.post('/contracts/analyze/pdf', uploadPdfMiddleware, async (req, res) => {
+  try {
+    if (!req.file?.buffer) {
+      return res.status(400).json({ error: 'Arquivo PDF nao enviado' });
+    }
+
+    const resolvedUserId = req.user?.userId || req.body.userId || null;
+    const parsed = await pdfParse(req.file.buffer);
+    const extractedText = String(parsed?.text || '').replace(/\u0000/g, ' ').trim();
+
+    if (extractedText.length < 50) {
+      return res.status(400).json({ error: 'Nao foi possivel extrair texto suficiente do PDF' });
+    }
+
+    const title = req.body.title || req.file.originalname || 'Contrato PDF';
+    const result = await contractAnalyzer.analyze(extractedText, resolvedUserId, title);
+
+    res.json({
+      success: true,
+      data: {
+        ...result,
+        source: 'pdf',
+        fileName: req.file.originalname,
+        pages: parsed?.numpages || null,
+        extractedChars: extractedText.length,
+      },
+    });
+  } catch (err) {
+    logger.error('Erro na analise de contrato PDF:', err.message);
+    res.status(500).json({ error: 'Erro ao analisar contrato PDF' });
+  }
+});
+
+/**
  * GET /api/contracts/:userId
- * Lista contratos de um usuário
+ * Lista contratos de um usuario
  */
 router.get('/contracts/:userId', async (req, res) => {
   try {
@@ -283,4 +354,3 @@ router.post('/chat', async (req, res) => {
 });
 
 module.exports = router;
-

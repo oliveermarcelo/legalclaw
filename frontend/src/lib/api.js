@@ -119,6 +119,62 @@ export async function analyzeContract(text, title) {
   return data.data || data;
 }
 
+export async function analyzeContractPdf(file, title) {
+  if (!file) throw new Error('Arquivo PDF nao informado');
+
+  const token = getToken();
+  if (!token) throw new Error('Nao autenticado');
+
+  const formData = new FormData();
+  formData.append('file', file);
+  if (title) formData.append('title', title);
+
+  const controller = new AbortController();
+  const timeoutMs = 30000;
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  let res;
+  try {
+    res = await fetch(`${API_URL}/api/contracts/analyze/pdf`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err?.name === 'AbortError') {
+      throw new Error('Tempo de resposta excedido. Tente novamente.');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  if (res.status === 401) {
+    clearToken();
+    if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+      window.location.href = '/login';
+    }
+    throw new Error('Nao autenticado');
+  }
+
+  const raw = await res.text();
+  let data = null;
+  try {
+    data = raw ? JSON.parse(raw) : {};
+  } catch {
+    data = {};
+  }
+
+  if (!res.ok) {
+    throw new Error(data.error || `Erro na requisicao (${res.status})`);
+  }
+
+  return data.data || data;
+}
+
 export async function getContracts() {
   const me = getUser();
   if (!me) throw new Error('Nao autenticado');
