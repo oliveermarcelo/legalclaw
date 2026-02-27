@@ -190,6 +190,42 @@ async function chatGemini(userMessage, systemPromptExtra, conversationHistory) {
 // INTERFACE UNIFICADA
 // ============================================================
 
+function mapProviderError(err) {
+  const status = err?.response?.status;
+  const body = err?.response?.data;
+  const detail = body?.error?.message || body?.message || '';
+
+  if (status === 401) {
+    return `Falha de autenticacao no provider ${provider} (401). Verifique a API key.`;
+  }
+
+  if (status === 403) {
+    return `Acesso negado no provider ${provider} (403). Verifique permissao/chave do projeto.`;
+  }
+
+  if (status === 404) {
+    return `Modelo ou endpoint nao encontrado no provider ${provider} (404).`;
+  }
+
+  if (status === 429) {
+    return `Limite de requisicoes do provider ${provider} atingido (429).`;
+  }
+
+  if (status >= 500) {
+    return `Provider ${provider} indisponivel no momento (${status}).`;
+  }
+
+  if (err?.code === 'ECONNABORTED') {
+    return `Timeout ao chamar provider ${provider}.`;
+  }
+
+  if (detail) {
+    return `Falha no provider ${provider}: ${detail}`;
+  }
+
+  return `Falha no provider ${provider}: ${err?.message || 'erro desconhecido'}`;
+}
+
 /**
  * Envia mensagem para a IA e retorna a resposta
  */
@@ -205,8 +241,9 @@ async function chat(userMessage, systemPromptExtra = '', conversationHistory = [
 
     throw new Error('Nenhum provider de IA configurado');
   } catch (err) {
-    logger.error(`Erro na chamada a IA (${provider}):`, err.message);
-    throw err;
+    const friendlyMessage = mapProviderError(err);
+    logger.error(`Erro na chamada a IA (${provider}): ${friendlyMessage}`);
+    throw new Error(friendlyMessage);
   }
 }
 

@@ -526,7 +526,7 @@ ${built.context}
     });
   } catch (err) {
     logger.error('Erro no chat:', err.message);
-    res.status(500).json({ error: 'Erro na conversa' });
+    res.status(500).json({ error: err.message || 'Erro na conversa' });
   }
 });
 
