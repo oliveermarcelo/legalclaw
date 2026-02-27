@@ -6,6 +6,7 @@ import {
   BellRing,
   Clock3,
   FileText,
+  FilePenLine,
   Gavel,
   MessageSquareText,
   Newspaper,
@@ -82,6 +83,12 @@ export default function DashboardPage() {
       icon: MessageSquareText,
       href: '/dashboard/chat',
       desc: 'Tire duvidas juridicas com assistente especializado.',
+    },
+    {
+      label: 'Fluxos juridicos',
+      icon: FilePenLine,
+      href: '/fluxos',
+      desc: 'Manifestacao, peca, parecer, revisao e analise guiada.',
     },
   ];
 

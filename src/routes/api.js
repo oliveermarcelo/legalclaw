@@ -6,6 +6,7 @@ const deadlineManager = require('../services/deadline-manager');
 const diarioMonitor = require('../services/diario-monitor');
 const knowledgeBase = require('../services/knowledge-base');
 const ai = require('../services/ai');
+const legalWorkflows = require('../services/legal-workflows');
 const logger = require('../utils/logger');
 
 const router = express.Router();
@@ -484,6 +485,59 @@ router.post('/knowledge/search', async (req, res) => {
 // ============================================================
 // CHAT (IA)
 // ============================================================
+
+/**
+ * GET /api/workflows/modes
+ * Lista modos especializados dos fluxos juridicos
+ */
+router.get('/workflows/modes', (req, res) => {
+  try {
+    res.json({
+      success: true,
+      data: legalWorkflows.listModes(),
+    });
+  } catch (err) {
+    logger.error('Erro ao listar modos de workflow:', err.message);
+    res.status(500).json({ error: 'Erro ao listar modos de workflow' });
+  }
+});
+
+/**
+ * POST /api/workflows/run
+ * Executa fluxo juridico especializado
+ */
+router.post('/workflows/run', async (req, res) => {
+  try {
+    const {
+      mode,
+      objective,
+      context,
+      documentText,
+      audience,
+      desiredOutput,
+      model,
+    } = req.body;
+
+    const result = await legalWorkflows.runWorkflow({
+      mode,
+      objective,
+      context,
+      documentText,
+      audience,
+      desiredOutput,
+      model,
+      userId: req.user?.userId || null,
+    });
+
+    res.json({ success: true, data: result });
+  } catch (err) {
+    logger.error('Erro no workflow juridico:', err.message);
+    if (/invalido|exige|Informe/.test(err.message || '')) {
+      return res.status(400).json({ error: err.message });
+    }
+    res.status(500).json({ error: err.message || 'Erro no workflow juridico' });
+  }
+});
 
 /**
  * GET /api/chat/models

@@ -5,6 +5,7 @@ import {
   Bot,
   Clock3,
   FileText,
+  FilePenLine,
   LayoutDashboard,
   LogOut,
   MessageCircle,
@@ -20,6 +21,7 @@ const NAV_ITEMS = [
   { href: '/prazos', label: 'Prazos', icon: Clock3 },
   { href: '/diarios', label: 'Diarios', icon: Newspaper },
   { href: '/conhecimento', label: 'Conhecimento', icon: BookOpenText },
+  { href: '/fluxos', label: 'Fluxos Juridicos', icon: FilePenLine },
   { href: '/dashboard/chat', label: 'Assistente IA', icon: Bot },
   { href: '/whatsapp', label: 'WhatsApp', icon: MessageCircle },
 ];

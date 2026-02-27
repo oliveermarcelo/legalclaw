@@ -302,6 +302,20 @@ export async function searchKnowledge(query, limit = 5) {
   return data.data || [];
 }
 
+// Fluxos juridicos
+export async function getWorkflowModes() {
+  const data = await request('/api/workflows/modes');
+  return data.data || [];
+}
+
+export async function runWorkflow(payload) {
+  const data = await request('/api/workflows/run', {
+    method: 'POST',
+    body: JSON.stringify(payload || {}),
+  });
+  return data.data || data;
+}
+
 // WhatsApp
 export async function getWhatsappStatus() {
   const data = await request('/webhooks/evolution/status');
