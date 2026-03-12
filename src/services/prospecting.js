@@ -3,7 +3,7 @@ const ai = require('./ai');
 const { pool } = require('../config/migrate');
 const logger = require('../utils/logger');
 
-// Mapeamento de especialidades para termos de busca e códigos de classe
+// Mapeamento de especialidades para termos de busca
 const SPECIALTY_TERMS = {
   trabalhista: { termoLivre: 'reclamação trabalhista rescisão FGTS aviso prévio', label: 'Trabalhista' },
   previdenciario: { termoLivre: 'aposentadoria benefício previdenciário INSS auxílio doença', label: 'Previdenciário' },
@@ -20,6 +20,77 @@ const SPECIALTY_TERMS = {
 function getSpecialtyConfig(specialty) {
   const key = String(specialty || '').toLowerCase().trim();
   return SPECIALTY_TERMS[key] || { termoLivre: specialty, label: specialty };
+}
+
+function safeDate(value) {
+  if (!value) return null;
+  const s = String(value);
+  // Tenta extrair YYYY-MM-DD diretamente para evitar problemas de timezone
+  const match = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) return `${match[3]}/${match[2]}/${match[1]}`;
+  return s.slice(0, 10) || null;
+}
+
+function mapOpportunity(p, score) {
+  return {
+    numeroProcesso: p.numeroProcesso || null,
+    classe: p.classe?.nome || (typeof p.classe === 'string' ? p.classe : null),
+    assuntos: Array.isArray(p.assuntos) ? p.assuntos.map((a) => a.nome || String(a)) : [],
+    orgaoJulgador: p.orgaoJulgador?.nome || (typeof p.orgaoJulgador === 'string' ? p.orgaoJulgador : null),
+    dataAjuizamento: safeDate(p.dataAjuizamento),
+    dataAtualizacao: safeDate(p.dataHoraUltimaAtualizacao),
+    grau: p.grau || null,
+    opportunityScore: score ?? null,
+  };
+}
+
+// Pede à IA para pontuar cada processo como oportunidade de prospecção (0-10)
+async function scoreProcesses(processes, specialtyLabel) {
+  if (processes.length === 0) return [];
+
+  const listText = processes
+    .map((p, i) => {
+      const classe = p.classe?.nome || p.classe || '';
+      const assuntos = Array.isArray(p.assuntos) ? p.assuntos.map((a) => a.nome || a).join(', ') : '';
+      return `${i}|${classe}|${assuntos}|${p.grau || ''}`;
+    })
+    .join('\n');
+
+  const prompt = `Você é especialista em prospecção jurídica para advogados de ${specialtyLabel}.
+
+Para cada processo abaixo, avalie de 0 a 10 a chance de ser uma oportunidade real de captação (pessoa física que pode precisar de advogado sem representação).
+
+Critérios para ALTA pontuação (7-10):
+- Pessoa física vs INSS por benefício negado, auxílio-doença, aposentadoria por invalidez
+- Reclamação trabalhista de empregado (rescisão, FGTS, horas extras, assédio)
+- Consumidor vs empresa (negativação indevida, defeito de produto, cobrança indevida)
+- Divórcio, alimentos, guarda litigiosos
+- Indenização por dano moral ou material de pessoa física
+- Execução de alimentos
+
+Critérios para BAIXA pontuação (0-3):
+- Procedimentos institucionais ou administrativos genéricos
+- Fazenda Pública, Município ou empresa propondo ação
+- Mandado de segurança empresarial
+- Processos entre órgãos públicos
+- Termo Circunstanciado (caso policial sem vítima claramente necessitando advogado)
+
+Processos (formato: índice|classe|assuntos|grau):
+${listText}
+
+Responda APENAS com um JSON array sem nenhum texto antes ou depois: [{"i":0,"s":8},{"i":1,"s":2},...]`;
+
+  try {
+    const result = await ai.chat(prompt, '', [], { model: ai.getDefaultModel() });
+    const text = (result.text || '').trim();
+    const match = text.match(/\[[\s\S]*?\]/);
+    if (!match) return null;
+    const parsed = JSON.parse(match[0]);
+    return parsed.map((item) => ({ index: Number(item.i), score: Number(item.s) }));
+  } catch (err) {
+    logger.warn(`Falha ao pontuar processos: ${err.message}`);
+    return null;
+  }
 }
 
 async function saveSearch({ userId, tribunalAlias, specialty, filters, totalFound, aiSummary, results }) {
@@ -60,16 +131,18 @@ async function listSearchHistory(userId, limit = 10) {
   }
 }
 
-async function searchOpportunities({ tribunalAlias, specialty, size = 15, userId = null }) {
+async function searchOpportunities({ tribunalAlias, specialty, size = 20, userId = null }) {
   if (!tribunalAlias) throw new Error('Selecione um tribunal para a prospecção.');
   if (!specialty) throw new Error('Informe a área jurídica para prospecção.');
 
   const specConfig = getSpecialtyConfig(specialty);
 
+  // Busca mais processos do que o necessário para filtrar depois
+  const fetchSize = Math.min(Math.max(parseInt(size, 10) || 20, 5), 50);
   const filters = {
     tribunalAlias,
     termoLivre: specConfig.termoLivre,
-    size: Math.min(Math.max(parseInt(size, 10) || 15, 1), 50),
+    size: fetchSize,
   };
 
   let searchResult;
@@ -92,60 +165,61 @@ async function searchOpportunities({ tribunalAlias, specialty, size = 15, userId
     };
   }
 
-  // Montar resumo para análise da IA
-  const processListText = results
-    .slice(0, 20)
-    .map((p, i) => {
-      const classe = p.classe?.nome || p.classe || '';
-      const assuntos = Array.isArray(p.assuntos)
-        ? p.assuntos.map((a) => a.nome || a).join(', ')
-        : '';
-      const orgao = p.orgaoJulgador?.nome || p.orgaoJulgador || '';
-      const dataAjuiz = p.dataAjuizamento ? p.dataAjuizamento.slice(0, 10) : '';
-      return `${i + 1}. Processo: ${p.numeroProcesso || '-'} | Classe: ${classe} | Assuntos: ${assuntos} | Órgão: ${orgao} | Ajuizamento: ${dataAjuiz}`;
-    })
-    .join('\n');
+  // Pontua cada processo como oportunidade
+  const scores = await scoreProcesses(results.slice(0, 30), specConfig.label);
+  const scoreMap = scores
+    ? Object.fromEntries(scores.map((s) => [s.index, s.score]))
+    : null;
 
-  const aiPrompt = `Você é um assistente jurídico especialista em prospecção de clientes para advogados.
+  // Filtra apenas oportunidades com pontuação >= 6 (ou mantém todos se scoring falhou)
+  const SCORE_THRESHOLD = 6;
+  const filteredResults = scoreMap
+    ? results.filter((_, i) => (scoreMap[i] ?? 0) >= SCORE_THRESHOLD)
+    : results;
 
-Analise os seguintes processos judiciais recentes na área de ${specConfig.label} no tribunal "${tribunalAlias.replace('api_publica_', '').toUpperCase()}" e identifique as melhores oportunidades de captação de novos clientes.
+  const opportunities = filteredResults.map((p, i) => {
+    const originalIndex = results.indexOf(p);
+    const score = scoreMap ? (scoreMap[originalIndex] ?? null) : null;
+    return mapOpportunity(p, score);
+  });
 
-Processos encontrados:
-${processListText}
-
-Por favor:
-1. Resuma em 2-3 parágrafos as principais oportunidades identificadas
-2. Destaque padrões (tipos de causa, órgãos com mais demanda, períodos de pico)
-3. Sugira como o advogado pode abordar essas oportunidades de forma ética
-
-Responda de forma objetiva e prática, focado em valor para o advogado.`;
-
+  // Análise geral da IA sobre as oportunidades filtradas
   let aiSummary = '';
-  try {
-    const aiResult = await ai.chat(aiPrompt, '', [], { model: ai.getComplexModel() });
-    aiSummary = aiResult.text || '';
-  } catch (err) {
-    logger.warn(`Falha na análise IA de prospecção: ${err.message}`);
-    aiSummary = `Encontrados ${results.length} processos na área de ${specConfig.label}. Analise os resultados para identificar oportunidades.`;
-  }
+  if (opportunities.length > 0) {
+    const summaryText = opportunities
+      .slice(0, 15)
+      .map((o, i) => `${i + 1}. ${o.classe || '-'} | ${(o.assuntos || []).join(', ')} | ${o.dataAjuizamento || '-'}`)
+      .join('\n');
 
-  // Mapear para formato de oportunidade
-  const opportunities = results.map((p) => ({
-    numeroProcesso: p.numeroProcesso || null,
-    classe: p.classe?.nome || p.classe || null,
-    assuntos: Array.isArray(p.assuntos) ? p.assuntos.map((a) => a.nome || a) : [],
-    orgaoJulgador: p.orgaoJulgador?.nome || p.orgaoJulgador || null,
-    dataAjuizamento: p.dataAjuizamento || null,
-    dataAtualizacao: p.dataHoraUltimaAtualizacao || null,
-    grau: p.grau || null,
-  }));
+    const aiPrompt = `Você é um assistente jurídico especialista em prospecção de clientes para advogados de ${specConfig.label}.
+
+Abaixo estão ${opportunities.length} processos identificados como oportunidades reais de captação no tribunal ${tribunalAlias.replace('api_publica_', '').toUpperCase()}.
+
+Oportunidades:
+${summaryText}
+
+Em 2-3 parágrafos objetivos:
+1. Quais os padrões mais frequentes (tipos de causa, demandas recorrentes)?
+2. Como o advogado pode se posicionar para captar esses clientes de forma ética?
+3. Qual o potencial de mercado dessa demanda?`;
+
+    try {
+      const aiResult = await ai.chat(aiPrompt, '', [], { model: ai.getComplexModel() });
+      aiSummary = aiResult.text || '';
+    } catch (err) {
+      logger.warn(`Falha na análise IA de prospecção: ${err.message}`);
+      aiSummary = `${opportunities.length} oportunidade(s) identificada(s) na área de ${specConfig.label}. Analise os processos listados para identificar potenciais clientes.`;
+    }
+  } else {
+    aiSummary = `Nenhuma oportunidade clara de prospecção identificada entre os ${results.length} processos encontrados. Tente outro tribunal ou área jurídica.`;
+  }
 
   await saveSearch({
     userId,
     tribunalAlias,
     specialty,
     filters,
-    totalFound: total || results.length,
+    totalFound: opportunities.length,
     aiSummary,
     results: opportunities,
   });
@@ -154,7 +228,7 @@ Responda de forma objetiva e prática, focado em valor para o advogado.`;
     tribunalAlias,
     specialty: specConfig.label,
     totalFound: total || results.length,
-    returned: opportunities.length,
+    filteredCount: opportunities.length,
     aiSummary,
     opportunities,
   };

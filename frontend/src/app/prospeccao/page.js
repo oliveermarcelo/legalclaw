@@ -24,11 +24,12 @@ function prettyAlias(alias) {
 
 function formatDate(value) {
   if (!value) return '-';
-  try {
-    return new Date(value).toLocaleDateString('pt-BR');
-  } catch {
-    return String(value).slice(0, 10);
-  }
+  // Aceita já formatado como DD/MM/YYYY
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(value)) return value;
+  // Extrai YYYY-MM-DD de strings ISO
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) return `${match[3]}/${match[2]}/${match[1]}`;
+  return String(value).slice(0, 10);
 }
 
 function sanitizeError(msg) {
@@ -244,15 +245,15 @@ export default function ProspeccaoPage() {
                   <div>
                     <h2 className="font-display text-xl text-surface-900">Análise de Oportunidades</h2>
                     <p className="text-sm text-surface-400 mt-0.5">
-                      {result.specialty} · {prettyAlias(result.tribunalAlias)} · {result.totalFound} processo(s) encontrado(s)
+                      {result.specialty} · {prettyAlias(result.tribunalAlias)} · {result.filteredCount ?? result.opportunities?.length ?? 0} oportunidade(s) de {result.totalFound} processo(s)
                     </p>
                   </div>
                 </div>
 
-                {result.totalFound > 0 && (
+                {(result.filteredCount ?? 0) > 0 && (
                   <div className="inline-flex items-center gap-1.5 mb-4 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs text-emerald-700 font-semibold">
                     <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={2.2} />
-                    {result.returned} processo(s) analisados
+                    {result.filteredCount} oportunidade(s) identificada(s)
                   </div>
                 )}
 
@@ -265,7 +266,7 @@ export default function ProspeccaoPage() {
               {result.opportunities && result.opportunities.length > 0 && (
                 <div className="rounded-3xl border border-surface-200/80 bg-white p-6 shadow-sm">
                   <h2 className="font-display text-xl text-surface-900 mb-4">
-                    Processos Encontrados
+                    Oportunidades Identificadas
                     <span className="ml-2 text-sm font-normal text-surface-400">({result.opportunities.length})</span>
                   </h2>
 
@@ -289,9 +290,19 @@ export default function ProspeccaoPage() {
                               </p>
                             )}
                           </div>
-                          <div className="text-right shrink-0">
+                          <div className="text-right shrink-0 flex flex-col items-end gap-1">
+                            {opp.opportunityScore != null && (
+                              <span className={[
+                                'text-[10px] font-bold px-2 py-0.5 rounded-full',
+                                opp.opportunityScore >= 8 ? 'bg-emerald-100 text-emerald-700' :
+                                opp.opportunityScore >= 6 ? 'bg-brand-100 text-brand-700' :
+                                'bg-surface-100 text-surface-500',
+                              ].join(' ')}>
+                                {opp.opportunityScore}/10
+                              </span>
+                            )}
                             <p className="text-[11px] text-surface-400">{opp.grau || ''}</p>
-                            <p className="text-[11px] text-surface-400 mt-0.5">{formatDate(opp.dataAjuizamento)}</p>
+                            <p className="text-[11px] text-surface-400">{formatDate(opp.dataAjuizamento)}</p>
                           </div>
                         </div>
                         {opp.orgaoJulgador && (
