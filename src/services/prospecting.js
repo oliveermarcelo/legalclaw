@@ -16,6 +16,35 @@ const SPECIALTY_TERMS = {
   ambiental: { termoLivre: 'meio ambiente licença ambiental poluição área de preservação', label: 'Ambiental' },
 };
 
+// Movimentos que indicam fase avançada — processo já encaminhado para decisão ou encerrado
+const MOVIMENTOS_FASE_AVANCADA = [
+  'mérito', 'sentença', 'acórdão', 'julgamento', 'transitado em julgado',
+  'baixa', 'arquivamento', 'arquivado', 'cumprimento de sentença',
+  'execução', 'liquidação', 'precatório', 'extinção', 'extinto',
+  'improcedente', 'procedente', 'provido', 'improvido', 'desprovido',
+];
+
+const MOVIMENTOS_FASE_INICIAL = [
+  'distribuição', 'recebimento', 'cadastramento', 'autuação',
+  'citação', 'intimação inicial', 'despacho inicial',
+];
+
+function classificarFase(movimentos) {
+  if (!Array.isArray(movimentos) || movimentos.length === 0) return 'desconhecida';
+  // Pega o último movimento (mais recente)
+  const nomes = movimentos
+    .slice(0, 5)
+    .map((m) => String(m.nome || m.descricao || '').toLowerCase());
+
+  for (const nome of nomes) {
+    if (MOVIMENTOS_FASE_AVANCADA.some((kw) => nome.includes(kw))) return 'avancada';
+  }
+  for (const nome of nomes) {
+    if (MOVIMENTOS_FASE_INICIAL.some((kw) => nome.includes(kw))) return 'inicial';
+  }
+  return 'intermediaria';
+}
+
 function getSpecialtyConfig(specialty) {
   const key = String(specialty || '').toLowerCase().trim();
   return SPECIALTY_TERMS[key] || { termoLivre: specialty, label: specialty };
@@ -50,6 +79,7 @@ function mapOpportunity(p, score) {
   const partes = Array.isArray(p.partes) ? p.partes : [];
   const movimentos = Array.isArray(p.movimentos) ? p.movimentos : [];
   const dias = daysSince(p.dataAjuizamento);
+  const fase = classificarFase(movimentos);
 
   return {
     numeroProcesso: p.numeroProcesso || null,
@@ -61,6 +91,7 @@ function mapOpportunity(p, score) {
     dataAjuizamento: safeDate(p.dataAjuizamento),
     dataAtualizacao: safeDate(p.dataHoraUltimaAtualizacao),
     diasDesdeAjuizamento: dias,
+    faseProcessual: fase,
     opportunityScore: score ?? null,
     // Detalhes extras
     partes: partes.map((pt) => ({
@@ -90,7 +121,8 @@ async function scoreProcesses(processes, specialtyLabel) {
           ? 'sim'
           : 'nao';
       }
-      return `${i}|${classe}|${assuntos}|${p.grau || ''}|${dias != null ? `${dias}d` : '?'}|adv:${advStatus}`;
+      const fase = classificarFase(Array.isArray(p.movimentos) ? p.movimentos : []);
+      return `${i}|${classe}|${assuntos}|${p.grau || ''}|${dias != null ? `${dias}d` : '?'}|adv:${advStatus}|fase:${fase}`;
     })
     .join('\n');
 
@@ -109,11 +141,14 @@ Critérios MÉDIA pontuação (5-6):
 
 Critérios BAIXA pontuação (0-3):
 - Já tem advogado confirmado ("adv:sim")
+- Fase avançada ("fase:avancada"): mérito, sentença, cumprimento, acórdão — processo quase encerrado
 - Procedimento institucional / Fazenda Pública propondo
 - Processo muito antigo (> 365 dias)
 - Empresas litigando entre si
 
-Formato: índice|classe|assuntos|grau|idade|tem_advogado
+Fase inicial ("fase:inicial") é um critério positivo — processo novo, maior chance de captação.
+
+Formato: índice|classe|assuntos|grau|idade|advogado|fase
 ${listText}
 
 Responda APENAS JSON array: [{"i":0,"s":8},{"i":1,"s":2},...]`;
@@ -217,10 +252,19 @@ async function searchOpportunities({ tribunalAlias, specialty, size = 20, months
     ? Object.fromEntries(scores.map((s) => [s.index, s.score]))
     : null;
 
+  // Remove processos em fase avançada (mérito, sentença, cumprimento...)
+  const resultsWithoutAdvanced = results.filter((p) => {
+    const fase = classificarFase(Array.isArray(p.movimentos) ? p.movimentos : []);
+    return fase !== 'avancada';
+  });
+
   const SCORE_THRESHOLD = 6;
   const filteredResults = scoreMap
-    ? results.filter((_, i) => (scoreMap[i] ?? 0) >= SCORE_THRESHOLD)
-    : results;
+    ? resultsWithoutAdvanced.filter((_, i) => {
+        const origIdx = results.indexOf(resultsWithoutAdvanced[i]);
+        return (scoreMap[origIdx] ?? 0) >= SCORE_THRESHOLD;
+      })
+    : resultsWithoutAdvanced;
 
   const opportunities = filteredResults.map((p) => {
     const originalIndex = results.indexOf(p);

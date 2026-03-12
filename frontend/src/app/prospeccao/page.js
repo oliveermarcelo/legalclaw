@@ -67,6 +67,13 @@ function scoreColor(score) {
   return 'bg-surface-100 text-surface-500 border-surface-200';
 }
 
+function faseLabel(fase) {
+  if (fase === 'inicial') return { label: 'Fase inicial', color: 'bg-emerald-50 text-emerald-700' };
+  if (fase === 'intermediaria') return { label: 'Em andamento', color: 'bg-brand-50 text-brand-600' };
+  if (fase === 'avancada') return { label: 'Fase avançada', color: 'bg-surface-100 text-surface-500' };
+  return null;
+}
+
 function urgencyLabel(days) {
   if (days == null) return null;
   if (days <= 30) return { label: 'Recente', color: 'text-emerald-600 bg-emerald-50' };
@@ -134,6 +141,9 @@ function DetailPanel({ opp, onClose }) {
                 Representação não informada
               </span>
             )}
+            {(() => { const f = faseLabel(opp.faseProcessual); return f ? (
+              <span className={`text-xs font-semibold px-3 py-1 rounded-full ${f.color}`}>{f.label}</span>
+            ) : null; })()}
           </div>
 
           {/* Dados gerais */}
@@ -424,6 +434,7 @@ export default function ProspeccaoPage() {
                     {result.opportunities.map((opp, idx) => {
                       const advStatus = statusAdvogado(opp.partes);
                       const urgency = urgencyLabel(opp.diasDesdeAjuizamento);
+                      const fase = faseLabel(opp.faseProcessual);
                       return (
                         <button
                           key={idx}
@@ -443,6 +454,9 @@ export default function ProspeccaoPage() {
                                 )}
                                 {advStatus === 'desconhecido' && (
                                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-600">Representação ?</span>
+                                )}
+                                {fase && (
+                                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${fase.color}`}>{fase.label}</span>
                                 )}
                                 {urgency && (
                                   <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${urgency.color}`}>{urgency.label}</span>
