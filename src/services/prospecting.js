@@ -31,9 +31,10 @@ const MOVIMENTOS_FASE_INICIAL = [
 
 function classificarFase(movimentos) {
   if (!Array.isArray(movimentos) || movimentos.length === 0) return 'desconhecida';
-  // Pega o último movimento (mais recente)
+  // Pega os últimos movimentos (mais recentes)
   const nomes = movimentos
-    .slice(0, 5)
+    .slice(-5)
+    .reverse()
     .map((m) => String(m.nome || m.descricao || '').toLowerCase());
 
   for (const nome of nomes) {
@@ -59,9 +60,13 @@ function dateMonthsAgo(months) {
 function safeDate(value) {
   if (!value) return null;
   const s = String(value);
-  const match = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (match) return `${match[3]}/${match[2]}/${match[1]}`;
-  return s.slice(0, 10) || null;
+  // YYYY-MM-DD ou YYYY-MM-DDTHH:MM
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
+  // YYYYMMDD (sem traços)
+  const compact = s.match(/^(\d{4})(\d{2})(\d{2})/);
+  if (compact) return `${compact[3]}/${compact[2]}/${compact[1]}`;
+  return null;
 }
 
 function daysSince(dateStr) {

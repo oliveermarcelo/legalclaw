@@ -27,9 +27,12 @@ function prettyAlias(alias) {
 function formatDate(value) {
   if (!value) return '-';
   if (/^\d{2}\/\d{2}\/\d{4}$/.test(value)) return value;
-  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (match) return `${match[3]}/${match[2]}/${match[1]}`;
-  return String(value).slice(0, 10);
+  const s = String(value);
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
+  const compact = s.match(/^(\d{4})(\d{2})(\d{2})/);
+  if (compact) return `${compact[3]}/${compact[2]}/${compact[1]}`;
+  return s.slice(0, 10);
 }
 
 function sanitizeError(msg) {
