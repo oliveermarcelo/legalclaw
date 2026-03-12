@@ -24,7 +24,7 @@ function setUser(user) {
   localStorage.setItem('drlex_user', JSON.stringify(user));
 }
 
-async function request(path, options = {}) {
+async function request(path, options = {}, timeoutMs = 15000) {
   const token = getToken();
   const headers = {
     'Content-Type': 'application/json',
@@ -33,7 +33,6 @@ async function request(path, options = {}) {
   };
 
   const controller = new AbortController();
-  const timeoutMs = 15000;
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   let res;
@@ -355,7 +354,7 @@ export async function searchProspectingOpportunities(payload) {
   const data = await request('/api/prospecting/search', {
     method: 'POST',
     body: JSON.stringify(payload || {}),
-  });
+  }, 90000);
   return data.data || data;
 }
 
