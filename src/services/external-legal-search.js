@@ -145,7 +145,7 @@ function mapProcessHit(hit, alias) {
     orgaoJulgador: source.orgaoJulgador || null,
     assuntos: Array.isArray(source.assuntos) ? source.assuntos : [],
     partes: Array.isArray(source.partes) ? source.partes : [],
-    movimentos: Array.isArray(source.movimentos) ? source.movimentos.slice(0, 10) : [],
+    movimentos: Array.isArray(source.movimentos) ? source.movimentos.slice(-15) : [],
     dataAjuizamento: source.dataAjuizamento || null,
     dataHoraUltimaAtualizacao: source.dataHoraUltimaAtualizacao || null,
     raw: source,

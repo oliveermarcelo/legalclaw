@@ -147,6 +147,7 @@ Critérios MÉDIA pontuação (5-6):
 Critérios BAIXA pontuação (0-3):
 - Já tem advogado confirmado ("adv:sim")
 - Fase avançada ("fase:avancada"): mérito, sentença, cumprimento, acórdão — processo quase encerrado
+- Grau G2/G3 (recurso/apelação) — parte já teve representação na 1ª instância
 - Procedimento institucional / Fazenda Pública propondo
 - Processo muito antigo (> 365 dias)
 - Empresas litigando entre si
@@ -258,7 +259,9 @@ async function searchOpportunities({ tribunalAlias, specialty, size = 20, months
     : null;
 
   // Remove processos em fase avançada (mérito, sentença, cumprimento...)
+  // e processos de 2ª instância (G2) — recurso/apelação, parte já teve advogado
   const resultsWithoutAdvanced = results.filter((p) => {
+    if (p.grau === 'G2' || p.grau === 'G3' || p.grau === 'GS') return false;
     const fase = classificarFase(Array.isArray(p.movimentos) ? p.movimentos : []);
     return fase !== 'avancada';
   });
