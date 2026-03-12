@@ -71,7 +71,7 @@ function getProviderStatus() {
 
 function buildDatajudClient() {
   if (!isDatajudConfigured()) {
-    throw new Error('Integracao DataJud nao configurada. Verifique DATAJUD_ENABLED e DATAJUD_API_KEY.');
+    throw new Error('Consulta processual nao disponivel no momento.');
   }
 
   return axios.create({
@@ -92,23 +92,21 @@ function safeInt(value, fallback, min, max) {
 
 function mapDatajudError(err) {
   const status = err?.response?.status;
-  const body = err?.response?.data;
-  const detail = body?.message || body?.detail || body?.error || err?.message || 'erro desconhecido';
 
   if (status === 401 || status === 403) {
-    return `Falha de autenticacao no DataJud (${status}). Verifique DATAJUD_API_KEY.`;
+    return 'Falha de autenticacao no sistema de consulta processual.';
   }
   if (status === 404) {
-    return 'Alias/endpoint DataJud nao encontrado (404). Verifique o tribunal selecionado.';
+    return 'Tribunal nao encontrado. Verifique o tribunal selecionado.';
   }
   if (status === 429) {
-    return 'Limite de requisicoes da API DataJud atingido.';
+    return 'Limite de consultas atingido. Tente novamente em instantes.';
   }
   if (status >= 500) {
-    return `DataJud indisponivel no momento (${status}).`;
+    return 'Sistema de consulta processual indisponivel no momento.';
   }
 
-  return `Falha na consulta DataJud: ${detail}`;
+  return 'Falha ao consultar o processo. Verifique o numero informado e tente novamente.';
 }
 
 async function logExternalCall({
@@ -170,7 +168,7 @@ async function searchProcessByCnj(numeroCnj, options = {}, userId = null) {
   const startedAt = Date.now();
   const formatted = formatCnj(numeroCnj);
   if (!formatted) {
-    throw new Error('Numero CNJ invalido. Informe no formato 0000000-00.0000.0.00.0000');
+    throw new Error('Numero de processo invalido. Informe os 20 digitos no formato correto.');
   }
 
   const digits = onlyDigits(numeroCnj);

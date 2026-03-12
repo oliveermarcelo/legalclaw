@@ -100,13 +100,16 @@ async function handle(text, { channel, remoteId, userName }) {
         response = formatHelp();
         break;
 
-      default:
-        // Conversa livre - usar Claude direto
+      default: {
+        // Conversa livre — usa modelo avancado para perguntas juridicas longas
+        const isComplexQuery = text.length > 300 || /lei|artigo|jurisprud|codigo|processo|tribunal|sentenca|recurso|contrato|clausula|direito/i.test(text);
+        const chatOptions = isComplexQuery ? { model: ai.getComplexModel() } : {};
         ctx.history.push({ role: 'user', content: text });
-        const aiResult = await ai.chat(text, '', ctx.history);
+        const aiResult = await ai.chat(text, '', ctx.history, chatOptions);
         ctx.history.push({ role: 'assistant', content: aiResult.text });
         response = aiResult.text;
         break;
+      }
     }
 
     await setContext(channelId, ctx);

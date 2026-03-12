@@ -335,6 +335,18 @@ function getModelConfig() {
 }
 
 /**
+ * Retorna o modelo mais capaz disponivel para tarefas complexas.
+ * OpenAI: prefere gpt-4o; outros providers: usa o modelo padrao.
+ */
+function getComplexModel() {
+  if (provider === 'openai') {
+    const models = getAvailableModels();
+    if (models.includes('gpt-4o')) return 'gpt-4o';
+  }
+  return getDefaultModel();
+}
+
+/**
  * Envia mensagem para a IA e retorna a resposta
  */
 async function chat(userMessage, systemPromptExtra = '', conversationHistory = [], options = {}) {
@@ -380,4 +392,5 @@ module.exports = {
   SYSTEM_PROMPT_BASE,
   getStatus,
   getModelConfig,
+  getComplexModel,
 };

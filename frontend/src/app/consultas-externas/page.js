@@ -14,12 +14,32 @@ import {
   searchExternalProcesses,
 } from '@/lib/api';
 
+function prettyAlias(alias) {
+  return String(alias || '')
+    .replace(/^api_publica_/i, '')
+    .toUpperCase();
+}
+
+function formatResult(data) {
+  if (!data) return null;
+  const { provider, tribunalAlias, ...rest } = data;
+  return rest;
+}
+
 function prettyJson(value) {
   try {
     return JSON.stringify(value, null, 2);
   } catch {
     return String(value || '');
   }
+}
+
+function sanitizeError(msg) {
+  return String(msg || 'Erro ao realizar a consulta.')
+    .replace(/datajud/gi, 'sistema')
+    .replace(/\bCNJ\b/g, 'processo')
+    .replace(/api_publica_\w+/gi, 'tribunal selecionado')
+    .replace(/DATAJUD_API_KEY/gi, 'configuração interna');
 }
 
 export default function ConsultasExternasPage() {
@@ -30,7 +50,7 @@ export default function ConsultasExternasPage() {
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState(null);
 
-  const [cnj, setCnj] = useState('');
+  const [numeroProcesso, setNumeroProcesso] = useState('');
   const [tribunalAlias, setTribunalAlias] = useState('');
   const [termoLivre, setTermoLivre] = useState('');
   const [classeCodigo, setClasseCodigo] = useState('');
@@ -51,21 +71,18 @@ export default function ConsultasExternasPage() {
         const providerConfig = data?.providers?.find((item) => item.id === currentProvider);
         const firstAlias = providerConfig?.aliases?.[0] || '';
         setTribunalAlias(firstAlias);
-      } catch (err) {
-        if (!active) return;
-        setError(err?.message || 'Erro ao carregar status das integracoes externas');
+      } catch {
+        // silencioso
       } finally {
         if (active) setLoadingMeta(false);
       }
     }
 
     loadMeta();
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, []);
 
-  const activeProvider = providerStatus?.provider || '-';
+  const activeProvider = providerStatus?.provider || '';
   const providerConfig = useMemo(
     () => providerStatus?.providers?.find((item) => item.id === activeProvider) || null,
     [providerStatus, activeProvider]
@@ -77,22 +94,22 @@ export default function ConsultasExternasPage() {
     setSuccess('');
     setResult(null);
 
-    if (!cnj.trim()) {
-      setError('Informe o numero CNJ.');
+    if (!numeroProcesso.trim()) {
+      setError('Informe o número do processo.');
       return;
     }
 
     setRunning(true);
     try {
       const data = await searchExternalProcessByCnj({
-        numeroCnj: cnj.trim(),
+        numeroCnj: numeroProcesso.trim(),
         tribunalAlias: tribunalAlias.trim() || undefined,
         size,
       });
-      setResult(data);
-      setSuccess('Consulta por CNJ realizada com sucesso.');
+      setResult(formatResult(data));
+      setSuccess('Consulta realizada com sucesso.');
     } catch (err) {
-      setError(err?.message || 'Erro na consulta por CNJ');
+      setError(sanitizeError(err?.message));
     } finally {
       setRunning(false);
     }
@@ -104,12 +121,12 @@ export default function ConsultasExternasPage() {
     setResult(null);
 
     if (!tribunalAlias.trim()) {
-      setError('Selecione um tribunal (alias) para a busca avancada.');
+      setError('Selecione um tribunal para a busca avançada.');
       return;
     }
 
-    if (!cnj.trim() && !termoLivre.trim() && !classeCodigo.trim() && !orgaoJulgadorCodigo.trim() && !assuntoCodigo.trim()) {
-      setError('Informe ao menos um filtro para a busca avancada.');
+    if (!numeroProcesso.trim() && !termoLivre.trim() && !classeCodigo.trim() && !orgaoJulgadorCodigo.trim() && !assuntoCodigo.trim()) {
+      setError('Informe ao menos um filtro para a busca.');
       return;
     }
 
@@ -117,17 +134,17 @@ export default function ConsultasExternasPage() {
     try {
       const data = await searchExternalProcesses({
         tribunalAlias: tribunalAlias.trim(),
-        numeroCnj: cnj.trim() || undefined,
+        numeroCnj: numeroProcesso.trim() || undefined,
         termoLivre: termoLivre.trim() || undefined,
         classeCodigo: classeCodigo.trim() || undefined,
         orgaoJulgadorCodigo: orgaoJulgadorCodigo.trim() || undefined,
         assuntoCodigo: assuntoCodigo.trim() || undefined,
         size,
       });
-      setResult(data);
-      setSuccess('Busca avancada realizada com sucesso.');
+      setResult(formatResult(data));
+      setSuccess('Busca realizada com sucesso.');
     } catch (err) {
-      setError(err?.message || 'Erro na busca avancada');
+      setError(sanitizeError(err?.message));
     } finally {
       setRunning(false);
     }
@@ -138,36 +155,31 @@ export default function ConsultasExternasPage() {
       <header className="mb-8">
         <span className="inline-flex items-center gap-2 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">
           <Sparkles className="h-3.5 w-3.5" strokeWidth={2.3} />
-          Integracao com sistemas juridicos externos
+          Consulta processual integrada
         </span>
-        <h1 className="font-display text-4xl text-surface-900 mt-3 mb-2">Consultas Externas</h1>
+        <h1 className="font-display text-4xl text-surface-900 mt-3 mb-2">Consulta de Processos</h1>
         <p className="text-surface-400 text-lg">
-          DataJud/CNJ: busque processos por CNJ e por filtros juridicos.
+          Busque processos judiciais por número ou por filtros jurídicos.
         </p>
       </header>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <section className="rounded-3xl border border-surface-200/80 bg-white p-6 shadow-sm">
-          <h2 className="font-display text-2xl text-surface-900 mb-1">Consulta DataJud</h2>
-          <p className="text-sm text-surface-400 mb-5">
-            Provider ativo: <span className="font-semibold text-surface-700">{activeProvider}</span>
-            {' | '}
-            Configurado: <span className="font-semibold text-surface-700">{providerConfig?.configured ? 'sim' : 'nao'}</span>
-          </p>
+          <h2 className="font-display text-2xl text-surface-900 mb-5">Busca de Processos</h2>
 
           {loadingMeta ? (
             <div className="inline-flex items-center gap-2 text-surface-500 text-sm">
               <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2.2} />
-              Carregando status...
+              Carregando...
             </div>
           ) : (
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <input
                   className="input-field"
-                  value={cnj}
-                  onChange={(e) => setCnj(e.target.value)}
-                  placeholder="Numero CNJ"
+                  value={numeroProcesso}
+                  onChange={(e) => setNumeroProcesso(e.target.value)}
+                  placeholder="Número do processo"
                 />
 
                 <select
@@ -175,9 +187,9 @@ export default function ConsultasExternasPage() {
                   value={tribunalAlias}
                   onChange={(e) => setTribunalAlias(e.target.value)}
                 >
-                  <option value="">Selecionar alias</option>
+                  <option value="">Selecionar tribunal</option>
                   {aliases.map((alias) => (
-                    <option key={alias} value={alias}>{alias}</option>
+                    <option key={alias} value={alias}>{prettyAlias(alias)}</option>
                   ))}
                 </select>
               </div>
@@ -205,19 +217,19 @@ export default function ConsultasExternasPage() {
                   className="input-field"
                   value={classeCodigo}
                   onChange={(e) => setClasseCodigo(e.target.value)}
-                  placeholder="Codigo da classe"
+                  placeholder="Código da classe"
                 />
                 <input
                   className="input-field"
                   value={orgaoJulgadorCodigo}
                   onChange={(e) => setOrgaoJulgadorCodigo(e.target.value)}
-                  placeholder="Codigo do orgao"
+                  placeholder="Código do órgão"
                 />
                 <input
                   className="input-field"
                   value={assuntoCodigo}
                   onChange={(e) => setAssuntoCodigo(e.target.value)}
-                  placeholder="Codigo do assunto"
+                  placeholder="Código do assunto"
                 />
               </div>
 
@@ -228,7 +240,7 @@ export default function ConsultasExternasPage() {
                   onClick={handleSearchByCnj}
                 >
                   {running ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2.2} /> : <Search className="h-4 w-4" strokeWidth={2.2} />}
-                  Buscar por CNJ
+                  Buscar por número
                 </button>
 
                 <button
@@ -237,7 +249,7 @@ export default function ConsultasExternasPage() {
                   onClick={handleAdvancedSearch}
                 >
                   <Search className="h-4 w-4" strokeWidth={2.2} />
-                  Busca avancada
+                  Busca avançada
                 </button>
               </div>
             </div>
@@ -260,7 +272,7 @@ export default function ConsultasExternasPage() {
 
         <section className="rounded-3xl border border-surface-200/80 bg-white p-6 shadow-sm">
           <h2 className="font-display text-2xl text-surface-900 mb-1">Resultado</h2>
-          <p className="text-sm text-surface-400 mb-5">Resposta bruta da API DataJud.</p>
+          <p className="text-sm text-surface-400 mb-5">Dados retornados pela consulta.</p>
 
           <pre className="rounded-2xl border border-surface-200 bg-surface-50 p-4 text-xs leading-relaxed text-surface-800 overflow-auto max-h-[70vh] whitespace-pre-wrap break-all">
             {result ? prettyJson(result) : 'Sem resultado ainda.'}
@@ -270,4 +282,3 @@ export default function ConsultasExternasPage() {
     </div>
   );
 }
-

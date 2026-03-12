@@ -210,11 +210,14 @@ Regras:
     desiredOutput: safeDesiredOutput,
   });
 
+  // Workflows sao tarefas complexas: usar modelo avancado salvo se o caller especificou outro
+  const resolvedModel = sanitizeText(model, 120) || ai.getComplexModel();
+
   const result = await ai.chat(
     userPrompt,
     [composedSystemPrompt, rag.systemPromptExtra].filter(Boolean).join('\n\n'),
     [],
-    { model: sanitizeText(model, 120) }
+    { model: resolvedModel }
   );
 
   return {

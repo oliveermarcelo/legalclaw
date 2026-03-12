@@ -23,7 +23,7 @@ const NAV_ITEMS = [
   { href: '/diarios', label: 'Diarios', icon: Newspaper },
   { href: '/conhecimento', label: 'Conhecimento', icon: BookOpenText },
   { href: '/fluxos', label: 'Fluxos Juridicos', icon: FilePenLine },
-  { href: '/consultas-externas', label: 'Consultas Externas', icon: Link2 },
+  { href: '/consultas-externas', label: 'Processos', icon: Link2 },
   { href: '/dashboard/chat', label: 'Assistente IA', icon: Bot },
   { href: '/whatsapp', label: 'WhatsApp', icon: MessageCircle },
 ];
