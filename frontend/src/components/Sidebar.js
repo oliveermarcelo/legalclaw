@@ -13,6 +13,7 @@ import {
   Newspaper,
   Scale,
   ShieldCheck,
+  Target,
 } from 'lucide-react';
 import { getUser, logout } from '@/lib/api';
 
@@ -24,6 +25,7 @@ const NAV_ITEMS = [
   { href: '/conhecimento', label: 'Conhecimento', icon: BookOpenText },
   { href: '/fluxos', label: 'Fluxos Juridicos', icon: FilePenLine },
   { href: '/consultas-externas', label: 'Processos', icon: Link2 },
+  { href: '/prospeccao', label: 'Prospecção', icon: Target },
   { href: '/dashboard/chat', label: 'Assistente IA', icon: Bot },
   { href: '/whatsapp', label: 'WhatsApp', icon: MessageCircle },
 ];

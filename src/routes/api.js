@@ -8,6 +8,7 @@ const knowledgeBase = require('../services/knowledge-base');
 const ai = require('../services/ai');
 const legalWorkflows = require('../services/legal-workflows');
 const externalLegalSearch = require('../services/external-legal-search');
+const prospecting = require('../services/prospecting');
 const logger = require('../utils/logger');
 
 const router = express.Router();
@@ -634,6 +635,61 @@ router.get('/chat/models', (req, res) => {
   } catch (err) {
     logger.error('Erro ao listar modelos de chat:', err.message);
     res.status(500).json({ error: 'Erro ao listar modelos de chat' });
+  }
+});
+
+/**
+ * GET /api/prospecting/specialties
+ * Lista especialidades disponíveis para prospecção
+ */
+router.get('/prospecting/specialties', (req, res) => {
+  const specialties = Object.entries(prospecting.SPECIALTY_TERMS).map(([key, val]) => ({
+    key,
+    label: val.label,
+  }));
+  res.json({ success: true, data: specialties });
+});
+
+/**
+ * GET /api/prospecting/history
+ * Histórico de buscas de prospecção do usuário
+ */
+router.get('/prospecting/history', async (req, res) => {
+  try {
+    const userId = req.user?.userId || null;
+    if (!userId) return res.status(401).json({ error: 'Autenticação necessária' });
+    const history = await prospecting.listSearchHistory(userId, 20);
+    res.json({ success: true, data: history });
+  } catch (err) {
+    logger.error('Erro ao buscar histórico de prospecção:', err.message);
+    res.status(500).json({ error: 'Erro ao carregar histórico' });
+  }
+});
+
+/**
+ * POST /api/prospecting/search
+ * Busca oportunidades de prospecção jurídica
+ */
+router.post('/prospecting/search', async (req, res) => {
+  try {
+    const { tribunalAlias, specialty, size } = req.body;
+    if (!tribunalAlias) return res.status(400).json({ error: 'tribunalAlias é obrigatório' });
+    if (!specialty) return res.status(400).json({ error: 'specialty é obrigatório' });
+
+    const result = await prospecting.searchOpportunities({
+      tribunalAlias,
+      specialty,
+      size,
+      userId: req.user?.userId || null,
+    });
+
+    res.json({ success: true, data: result });
+  } catch (err) {
+    logger.error('Erro na prospecção:', err.message);
+    if (/Selecione|Informe|obrigatório/i.test(err.message || '')) {
+      return res.status(400).json({ error: err.message });
+    }
+    res.status(500).json({ error: err.message || 'Erro na prospecção' });
   }
 });
 

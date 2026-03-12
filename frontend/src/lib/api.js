@@ -340,6 +340,25 @@ export async function getExternalProcessRefreshStatus(payload) {
   return data.data || data;
 }
 
+// Prospecção juridica
+export async function getProspectingSpecialties() {
+  const data = await request('/api/prospecting/specialties');
+  return data.data || [];
+}
+
+export async function getProspectingHistory() {
+  const data = await request('/api/prospecting/history');
+  return data.data || [];
+}
+
+export async function searchProspectingOpportunities(payload) {
+  const data = await request('/api/prospecting/search', {
+    method: 'POST',
+    body: JSON.stringify(payload || {}),
+  });
+  return data.data || data;
+}
+
 // Fluxos juridicos
 export async function getWorkflowModes() {
   const data = await request('/api/workflows/modes');

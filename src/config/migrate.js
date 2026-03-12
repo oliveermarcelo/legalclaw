@@ -118,6 +118,19 @@ const migrations = [
     created_at TIMESTAMP DEFAULT NOW()
   )`,
 
+  // Prospecção de oportunidades jurídicas
+  `CREATE TABLE IF NOT EXISTS prospecting_searches (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id),
+    tribunal_alias VARCHAR(80) NOT NULL,
+    specialty VARCHAR(200) NOT NULL,
+    filters JSONB DEFAULT '{}'::jsonb,
+    total_found INTEGER DEFAULT 0,
+    ai_summary TEXT,
+    results JSONB DEFAULT '[]'::jsonb,
+    created_at TIMESTAMP DEFAULT NOW()
+  )`,
+
   // Índices
   `CREATE INDEX IF NOT EXISTS idx_contracts_user ON contracts(user_id)`,
   `CREATE INDEX IF NOT EXISTS idx_deadlines_user_date ON deadlines(user_id, deadline_date)`,
@@ -130,6 +143,7 @@ const migrations = [
   `CREATE INDEX IF NOT EXISTS idx_knowledge_chunks_tsv ON knowledge_chunks USING GIN (to_tsvector('portuguese', content))`,
   `CREATE INDEX IF NOT EXISTS idx_external_query_logs_user_date ON external_query_logs(user_id, created_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_external_query_logs_provider ON external_query_logs(provider, operation, created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_prospecting_searches_user ON prospecting_searches(user_id, created_at DESC)`,
 ];
 
 async function migrate() {
