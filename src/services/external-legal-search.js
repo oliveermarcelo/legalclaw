@@ -150,6 +150,8 @@ function mapProcessHit(hit, alias) {
     classe: source.classe || null,
     orgaoJulgador: source.orgaoJulgador || null,
     assuntos: Array.isArray(source.assuntos) ? source.assuntos : [],
+    partes: Array.isArray(source.partes) ? source.partes : [],
+    movimentos: Array.isArray(source.movimentos) ? source.movimentos.slice(0, 10) : [],
     dataAjuizamento: source.dataAjuizamento || null,
     dataHoraUltimaAtualizacao: source.dataHoraUltimaAtualizacao || null,
     raw: source,
@@ -270,8 +272,13 @@ function buildAdvancedQuery(filters = {}) {
     throw new Error('Informe ao menos um filtro de busca');
   }
 
+  const filter = [];
+  if (filters.dateFrom) {
+    filter.push({ range: { dataAjuizamento: { gte: filters.dateFrom } } });
+  }
+
   return {
-    query: { bool: { must } },
+    query: { bool: { must, ...(filter.length > 0 ? { filter } : {}) } },
   };
 }
 
