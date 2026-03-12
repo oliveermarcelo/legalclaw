@@ -38,6 +38,34 @@ function sanitizeError(msg) {
     .replace(/api_publica_\w+/gi, 'tribunal selecionado');
 }
 
+// Renderiza markdown simples: **bold** e quebras de linha
+function renderMarkdown(text) {
+  if (!text) return [];
+  return text.split('\n').map((line, i) => {
+    const parts = line.split(/\*\*(.+?)\*\*/g);
+    return (
+      <span key={i}>
+        {parts.map((part, j) => j % 2 === 1 ? <strong key={j}>{part}</strong> : part)}
+        {i < text.split('\n').length - 1 && <br />}
+      </span>
+    );
+  });
+}
+
+// Tribunal recomendado por especialidade
+const SPECIALTY_TRIBUNAL_HINTS = {
+  trabalhista: { hint: 'Use TRT1–TRT5 ou TST', aliases: ['trt1', 'trt2', 'trt3', 'trt4', 'trt5', 'tst'] },
+  previdenciario: { hint: 'Use TRF1–TRF5 (Justiça Federal)', aliases: ['trf1', 'trf2', 'trf3', 'trf4', 'trf5'] },
+  tributario: { hint: 'Use TRF1–TRF5 ou TJs estaduais', aliases: ['trf1', 'trf2', 'trf3', 'trf4', 'trf5'] },
+  consumidor: { hint: 'Use TJs estaduais (TJBA, TJSP...)', aliases: ['tjba', 'tjsp', 'tjmg', 'tjrj', 'tjrs'] },
+  civil: { hint: 'Use TJs estaduais (TJBA, TJSP...)', aliases: ['tjba', 'tjsp', 'tjmg', 'tjrj', 'tjrs'] },
+  familia: { hint: 'Use TJs estaduais (TJBA, TJSP...)', aliases: ['tjba', 'tjsp', 'tjmg', 'tjrj', 'tjrs'] },
+  criminal: { hint: 'Use TJs estaduais', aliases: ['tjba', 'tjsp', 'tjmg', 'tjrj', 'tjrs'] },
+  empresarial: { hint: 'Use TJs estaduais ou TRFs', aliases: ['tjba', 'tjsp', 'tjmg', 'tjrj', 'tjrs'] },
+  imobiliario: { hint: 'Use TJs estaduais', aliases: ['tjba', 'tjsp', 'tjmg', 'tjrj', 'tjrs'] },
+  ambiental: { hint: 'Use TRFs ou TJs estaduais', aliases: ['trf1', 'trf2', 'trf3', 'trf4', 'trf5'] },
+};
+
 export default function ProspeccaoPage() {
   const [loadingMeta, setLoadingMeta] = useState(true);
   const [aliases, setAliases] = useState([]);
@@ -51,6 +79,11 @@ export default function ProspeccaoPage() {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
+
+  const tribunalHint = specialty ? SPECIALTY_TRIBUNAL_HINTS[specialty] : null;
+  const tribunalMismatch = tribunalHint && tribunalAlias
+    ? !tribunalHint.aliases.some((a) => tribunalAlias.includes(a))
+    : false;
 
   useEffect(() => {
     let active = true;
@@ -159,6 +192,18 @@ export default function ProspeccaoPage() {
                 </select>
               </div>
 
+              {tribunalHint && (
+                <p className="text-[11px] text-surface-400 -mt-2">
+                  Recomendado: <span className="font-semibold text-brand-600">{tribunalHint.hint}</span>
+                </p>
+              )}
+              {tribunalMismatch && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 flex items-start gap-1.5">
+                  <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" strokeWidth={2.2} />
+                  <span>Este tribunal pode não ter processos dessa área. {tribunalHint.hint}.</span>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-semibold text-surface-500 uppercase tracking-wide mb-1.5">
                   Área Jurídica
@@ -257,9 +302,9 @@ export default function ProspeccaoPage() {
                   </div>
                 )}
 
-                <p className="text-sm text-surface-700 leading-relaxed whitespace-pre-wrap">
-                  {result.aiSummary}
-                </p>
+                <div className="text-sm text-surface-700 leading-relaxed">
+                  {renderMarkdown(result.aiSummary)}
+                </div>
               </div>
 
               {/* Lista de processos */}
