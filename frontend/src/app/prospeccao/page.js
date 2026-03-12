@@ -232,6 +232,7 @@ export default function ProspeccaoPage() {
   const [specialty, setSpecialty] = useState('');
   const [size, setSize] = useState(20);
   const [monthsBack, setMonthsBack] = useState(6);
+  const [uf, setUf] = useState('');
 
   const [running, setRunning] = useState(false);
   const [error, setError] = useState('');
@@ -276,7 +277,7 @@ export default function ProspeccaoPage() {
     if (!specialty) { setError('Selecione uma área jurídica.'); return; }
     setRunning(true);
     try {
-      const data = await searchProspectingOpportunities({ tribunalAlias, specialty, size, monthsBack });
+      const data = await searchProspectingOpportunities({ tribunalAlias, specialty, size, monthsBack, uf: uf || null });
       setResult(data);
       const h = await getProspectingHistory();
       setHistory(Array.isArray(h) ? h : []);
@@ -341,6 +342,16 @@ export default function ProspeccaoPage() {
                   <option value="">Selecionar área</option>
                   {specialties.map((s) => (
                     <option key={s.key} value={s.key}>{s.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-surface-500 uppercase tracking-wide mb-1.5">Estado (UF) <span className="normal-case font-normal text-surface-400">— opcional</span></label>
+                <select className="input-field w-full" value={uf} onChange={(e) => setUf(e.target.value)}>
+                  <option value="">Todos os estados</option>
+                  {['AC','AL','AM','AP','BA','CE','DF','ES','GO','MA','MG','MS','MT','PA','PB','PE','PI','PR','RJ','RN','RO','RR','RS','SC','SE','SP','TO'].map((s) => (
+                    <option key={s} value={s}>{s}</option>
                   ))}
                 </select>
               </div>

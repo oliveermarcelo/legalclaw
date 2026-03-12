@@ -270,6 +270,9 @@ function buildAdvancedQuery(filters = {}) {
   if (filters.dateFrom) {
     filter.push({ range: { dataAjuizamento: { gte: filters.dateFrom } } });
   }
+  if (filters.uf) {
+    filter.push({ wildcard: { 'orgaoJulgador.nome': `*${String(filters.uf).toUpperCase()}*` } });
+  }
 
   return {
     query: { bool: { must, ...(filter.length > 0 ? { filter } : {}) } },

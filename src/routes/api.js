@@ -672,7 +672,7 @@ router.get('/prospecting/history', async (req, res) => {
  */
 router.post('/prospecting/search', async (req, res) => {
   try {
-    const { tribunalAlias, specialty, size } = req.body;
+    const { tribunalAlias, specialty, size, monthsBack, uf } = req.body;
     if (!tribunalAlias) return res.status(400).json({ error: 'tribunalAlias é obrigatório' });
     if (!specialty) return res.status(400).json({ error: 'specialty é obrigatório' });
 
@@ -680,6 +680,8 @@ router.post('/prospecting/search', async (req, res) => {
       tribunalAlias,
       specialty,
       size,
+      monthsBack,
+      uf: uf || null,
       userId: req.user?.userId || null,
     });
 

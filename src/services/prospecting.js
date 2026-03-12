@@ -22,6 +22,8 @@ const MOVIMENTOS_FASE_AVANCADA = [
   'baixa', 'arquivamento', 'arquivado', 'cumprimento de sentença',
   'execução', 'liquidação', 'precatório', 'extinção', 'extinto',
   'improcedente', 'procedente', 'provido', 'improvido', 'desprovido',
+  'provimento', 'não provimento', 'não-provimento', 'negado seguimento',
+  'julgado', 'decidido', 'homologado',
 ];
 
 const MOVIMENTOS_FASE_INICIAL = [
@@ -210,19 +212,21 @@ async function listSearchHistory(userId, limit = 10) {
   }
 }
 
-async function searchOpportunities({ tribunalAlias, specialty, size = 20, monthsBack = 6, userId = null }) {
+async function searchOpportunities({ tribunalAlias, specialty, size = 20, monthsBack = 6, uf = null, userId = null }) {
   if (!tribunalAlias) throw new Error('Selecione um tribunal para a prospecção.');
   if (!specialty) throw new Error('Informe a área jurídica para prospecção.');
 
   const specConfig = getSpecialtyConfig(specialty);
   const fetchSize = Math.min(Math.max(parseInt(size, 10) || 20, 5), 50);
   const dateFrom = dateMonthsAgo(Math.min(Math.max(parseInt(monthsBack, 10) || 6, 1), 24));
+  const ufClean = uf ? String(uf).toUpperCase().trim().slice(0, 2) : null;
 
   const filters = {
     tribunalAlias,
     termoLivre: specConfig.termoLivre,
     size: fetchSize,
     dateFrom,
+    ...(ufClean ? { uf: ufClean } : {}),
   };
 
   let searchResult;
@@ -231,7 +235,7 @@ async function searchOpportunities({ tribunalAlias, specialty, size = 20, months
   } catch (err) {
     // Se o filtro de data não funcionar no tribunal, tenta sem ele
     try {
-      const fallbackFilters = { tribunalAlias, termoLivre: specConfig.termoLivre, size: fetchSize };
+      const fallbackFilters = { tribunalAlias, termoLivre: specConfig.termoLivre, size: fetchSize, ...(ufClean ? { uf: ufClean } : {}) };
       searchResult = await searchProcesses(fallbackFilters, userId);
     } catch (err2) {
       throw new Error(`Falha na busca processual: ${err2.message}`);
@@ -261,7 +265,7 @@ async function searchOpportunities({ tribunalAlias, specialty, size = 20, months
   // Remove processos em fase avançada (mérito, sentença, cumprimento...)
   // e processos de 2ª instância (G2) — recurso/apelação, parte já teve advogado
   const resultsWithoutAdvanced = results.filter((p) => {
-    if (p.grau === 'G2' || p.grau === 'G3' || p.grau === 'GS') return false;
+    if (p.grau === 'G2' || p.grau === 'G3' || p.grau === 'GS' || p.grau === 'TR') return false;
     const fase = classificarFase(Array.isArray(p.movimentos) ? p.movimentos : []);
     return fase !== 'avancada';
   });
