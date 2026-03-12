@@ -51,6 +51,16 @@ function renderMarkdown(text) {
   });
 }
 
+// Retorna: 'sem_advogado' | 'com_advogado' | 'desconhecido'
+function statusAdvogado(partes) {
+  if (!Array.isArray(partes) || partes.length === 0) return 'desconhecido';
+  const temNome = partes.some((p) => p.nome);
+  if (!temNome) return 'desconhecido';
+  const algumTemAdv = partes.some((p) => Array.isArray(p.advogados) && p.advogados.length > 0);
+  if (algumTemAdv) return 'com_advogado';
+  return 'sem_advogado';
+}
+
 function scoreColor(score) {
   if (score >= 8) return 'bg-emerald-100 text-emerald-700 border-emerald-200';
   if (score >= 6) return 'bg-brand-100 text-brand-700 border-brand-200';
@@ -80,7 +90,7 @@ const SPECIALTY_TRIBUNAL_HINTS = {
 
 function DetailPanel({ opp, onClose }) {
   if (!opp) return null;
-  const semAdvogado = opp.partes?.every((p) => !p.advogados || p.advogados.length === 0);
+  const advStatus = statusAdvogado(opp.partes);
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end" onClick={onClose}>
@@ -109,9 +119,19 @@ function DetailPanel({ opp, onClose }) {
             {(() => { const u = urgencyLabel(opp.diasDesdeAjuizamento); return u ? (
               <span className={`text-xs font-semibold px-3 py-1 rounded-full ${u.color}`}>{u.label}</span>
             ) : null; })()}
-            {semAdvogado && (
-              <span className="text-xs font-semibold px-3 py-1 rounded-full bg-emerald-50 text-emerald-700">
-                Sem advogado
+            {advStatus === 'sem_advogado' && (
+              <span className="text-xs font-semibold px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                Sem advogado cadastrado
+              </span>
+            )}
+            {advStatus === 'com_advogado' && (
+              <span className="text-xs font-semibold px-3 py-1 rounded-full bg-surface-100 text-surface-500">
+                Com advogado
+              </span>
+            )}
+            {advStatus === 'desconhecido' && (
+              <span className="text-xs px-3 py-1 rounded-full bg-amber-50 text-amber-600 border border-amber-200">
+                Representação não informada
               </span>
             )}
           </div>
@@ -402,7 +422,7 @@ export default function ProspeccaoPage() {
 
                   <div className="space-y-2.5 max-h-[62vh] overflow-auto pr-1">
                     {result.opportunities.map((opp, idx) => {
-                      const semAdv = opp.partes?.every((p) => !p.advogados || p.advogados.length === 0);
+                      const advStatus = statusAdvogado(opp.partes);
                       const urgency = urgencyLabel(opp.diasDesdeAjuizamento);
                       return (
                         <button
@@ -418,8 +438,11 @@ export default function ProspeccaoPage() {
                                 <p className="text-xs text-surface-500 mt-0.5 truncate">{opp.assuntos.join(' · ')}</p>
                               )}
                               <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                {semAdv && (
+                                {advStatus === 'sem_advogado' && (
                                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Sem advogado</span>
+                                )}
+                                {advStatus === 'desconhecido' && (
+                                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-600">Representação ?</span>
                                 )}
                                 {urgency && (
                                   <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${urgency.color}`}>{urgency.label}</span>

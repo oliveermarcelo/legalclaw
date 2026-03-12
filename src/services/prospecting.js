@@ -83,10 +83,14 @@ async function scoreProcesses(processes, specialtyLabel) {
       const classe = p.classe?.nome || p.classe || '';
       const assuntos = Array.isArray(p.assuntos) ? p.assuntos.map((a) => a.nome || a).join(', ') : '';
       const dias = daysSince(p.dataAjuizamento);
-      const temAdvogado = Array.isArray(p.partes) && p.partes.some(
-        (pt) => Array.isArray(pt.advogados) && pt.advogados.length > 0
-      );
-      return `${i}|${classe}|${assuntos}|${p.grau || ''}|${dias != null ? `${dias}d` : '?'}|adv:${temAdvogado ? 'sim' : 'nao'}`;
+      const partesComNome = Array.isArray(p.partes) ? p.partes.filter((pt) => pt.nome) : [];
+      let advStatus = 'desconhecido';
+      if (partesComNome.length > 0) {
+        advStatus = partesComNome.some((pt) => Array.isArray(pt.advogados) && pt.advogados.length > 0)
+          ? 'sim'
+          : 'nao';
+      }
+      return `${i}|${classe}|${assuntos}|${p.grau || ''}|${dias != null ? `${dias}d` : '?'}|adv:${advStatus}`;
     })
     .join('\n');
 
@@ -95,13 +99,16 @@ async function scoreProcesses(processes, specialtyLabel) {
 Para cada processo, avalie de 0 a 10 a chance de ser uma oportunidade real de captação de cliente.
 
 Critérios ALTA pontuação (7-10):
-- Pessoa física sem advogado cadastrado ("adv:nao")
-- Processo recente (< 90 dias) = urgência maior
-- Matéria típica de pessoa física: trabalhista, previdenciário, consumidor, família
-- Indenização, benefício negado, rescisão, guarda, alimentos
+- Sem advogado confirmado ("adv:nao") + matéria de pessoa física
+- Processo recente (< 90 dias)
+- Matéria típica de pessoa física: trabalhista, previdenciário, consumidor, família, indenização, alimentos
+
+Critérios MÉDIA pontuação (5-6):
+- Representação desconhecida ("adv:desconhecido") mas matéria promissora
+- Processo recente sem dados completos de partes
 
 Critérios BAIXA pontuação (0-3):
-- Já tem advogado ("adv:sim") → oportunidade menor
+- Já tem advogado confirmado ("adv:sim")
 - Procedimento institucional / Fazenda Pública propondo
 - Processo muito antigo (> 365 dias)
 - Empresas litigando entre si
