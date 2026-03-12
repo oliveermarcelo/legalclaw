@@ -5,20 +5,14 @@ const { pool } = require('../config/migrate');
 
 const CNJ_DIGITS = 20;
 const DEFAULT_DATAJUD_ALIASES = [
-  'api_publica_trf1',
-  'api_publica_trf2',
-  'api_publica_trf3',
-  'api_publica_trf4',
-  'api_publica_trf5',
-  'api_publica_tjba',
-  'api_publica_tjsp',
-  'api_publica_tjmg',
-  'api_publica_tjrj',
-  'api_publica_tjrs',
-  'api_publica_stj',
-  'api_publica_tst',
-  'api_publica_tse',
-  'api_publica_stm',
+  'api_publica_tjba', 'api_publica_tjsp', 'api_publica_tjmg', 'api_publica_tjrj', 'api_publica_tjrs',
+  'api_publica_trf1', 'api_publica_trf2', 'api_publica_trf3', 'api_publica_trf4', 'api_publica_trf5',
+  'api_publica_trt1', 'api_publica_trt2', 'api_publica_trt3', 'api_publica_trt4', 'api_publica_trt5',
+  'api_publica_trt6', 'api_publica_trt7', 'api_publica_trt8', 'api_publica_trt9', 'api_publica_trt10',
+  'api_publica_trt11', 'api_publica_trt12', 'api_publica_trt13', 'api_publica_trt14', 'api_publica_trt15',
+  'api_publica_trt16', 'api_publica_trt17', 'api_publica_trt18', 'api_publica_trt19', 'api_publica_trt20',
+  'api_publica_trt21', 'api_publica_trt22', 'api_publica_trt23', 'api_publica_trt24',
+  'api_publica_stj', 'api_publica_tst', 'api_publica_tse', 'api_publica_stm',
 ];
 
 function onlyDigits(value) {
