@@ -339,6 +339,25 @@ export async function getExternalProcessRefreshStatus(payload) {
   return data.data || data;
 }
 
+// Geração de contratos
+export async function getContractGenerateTypes() {
+  const data = await request('/api/contracts/generate/types');
+  return data.data || [];
+}
+
+export async function generateContract(payload) {
+  const data = await request('/api/contracts/generate', {
+    method: 'POST',
+    body: JSON.stringify(payload || {}),
+  }, 60000);
+  return data.data || data;
+}
+
+export async function getGeneratedContracts() {
+  const data = await request('/api/contracts/generated');
+  return data.data || [];
+}
+
 // Prospecção juridica
 export async function getProspectingSpecialties() {
   const data = await request('/api/prospecting/specialties');

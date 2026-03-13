@@ -131,8 +131,22 @@ const migrations = [
     created_at TIMESTAMP DEFAULT NOW()
   )`,
 
+  // Contratos gerados por IA
+  `CREATE TABLE IF NOT EXISTS generated_contracts (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id),
+    contract_type VARCHAR(100) NOT NULL,
+    title VARCHAR(500) NOT NULL,
+    details_text TEXT NOT NULL,
+    contract_text TEXT NOT NULL,
+    pdf_filename VARCHAR(200),
+    pdf_url VARCHAR(500),
+    created_at TIMESTAMP DEFAULT NOW()
+  )`,
+
   // Índices
   `CREATE INDEX IF NOT EXISTS idx_contracts_user ON contracts(user_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_generated_contracts_user ON generated_contracts(user_id, created_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_deadlines_user_date ON deadlines(user_id, deadline_date)`,
   `CREATE INDEX IF NOT EXISTS idx_deadlines_status ON deadlines(status, deadline_date)`,
   `CREATE INDEX IF NOT EXISTS idx_diario_alerts_user ON diario_alerts(user_id, notified)`,

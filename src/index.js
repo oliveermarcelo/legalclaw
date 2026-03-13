@@ -3,6 +3,8 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const Redis = require('ioredis');
+const path = require('path');
+const fs = require('fs');
 
 const config = require('./config');
 const logger = require('./utils/logger');
@@ -41,6 +43,11 @@ app.use(
 );
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Servir PDFs gerados publicamente
+const generatedDir = path.join(process.cwd(), 'public', 'generated');
+if (!fs.existsSync(generatedDir)) fs.mkdirSync(generatedDir, { recursive: true });
+app.use('/generated', express.static(generatedDir));
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,

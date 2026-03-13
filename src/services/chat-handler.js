@@ -1,5 +1,6 @@
 const ai = require('./ai');
 const contractAnalyzer = require('./contract-analyzer');
+const contractGenerator = require('./contract-generator');
 const deadlineManager = require('./deadline-manager');
 const diarioMonitor = require('./diario-monitor');
 const { pool } = require('../config/migrate');
@@ -84,6 +85,90 @@ async function handle(text, { channel, remoteId, userName }) {
         ctx.state = 'idle';
         break;
 
+      case 'contract_generate': {
+        // Detectar tipo de contrato no próprio texto
+        const tipoDetectado = contractGenerator.getContractType(text);
+        if (tipoDetectado) {
+          ctx.state = 'awaiting_contract_gen_details';
+          ctx.contractGenType = tipoDetectado.key;
+          ctx.contractGenLabel = tipoDetectado.label;
+          await setContext(channelId, ctx);
+          return (
+            `📝 *Gerar Contrato de ${tipoDetectado.label}*\n\n` +
+            `Para gerar o contrato, preciso das seguintes informações:\n\n` +
+            `${tipoDetectado.hints}\n\n` +
+            `Pode enviar tudo de uma vez ou em partes. Quando terminar, diga *"gerar"*.`
+          );
+        }
+        // Tipo não identificado: pedir escolha
+        const lista = Object.entries(contractGenerator.CONTRACT_TYPES)
+          .map(([, cfg], i) => `${i + 1}. ${cfg.label}`)
+          .join('\n');
+        ctx.state = 'awaiting_contract_gen_type';
+        await setContext(channelId, ctx);
+        return `📝 *Geração de Contrato*\n\nQual tipo de contrato deseja gerar?\n\n${lista}\n\nResponda com o número ou o nome do tipo.`;
+      }
+
+      case 'awaiting_contract_gen_type': {
+        const tipoEscolhido = contractGenerator.getContractType(text);
+        if (!tipoEscolhido) {
+          return `Não entendi o tipo. Por favor, escolha um dos tipos listados ou envie o nome do contrato.`;
+        }
+        ctx.state = 'awaiting_contract_gen_details';
+        ctx.contractGenType = tipoEscolhido.key;
+        ctx.contractGenLabel = tipoEscolhido.label;
+        ctx.contractGenDetails = '';
+        await setContext(channelId, ctx);
+        return (
+          `📝 *${tipoEscolhido.label}*\n\n` +
+          `Preciso das seguintes informações:\n\n${tipoEscolhido.hints}\n\n` +
+          `Envie os dados e, quando terminar, diga *"gerar"*.`
+        );
+      }
+
+      case 'awaiting_contract_gen_details': {
+        // Acumular detalhes; quando diz "gerar", processar
+        const isReady = /^gerar$|^pode gerar|^gera a[ií]|^pronto|^pode fazer|^fazer|^ok gerar/i.test(text.trim());
+
+        if (!isReady) {
+          // Acumular e confirmar recebimento
+          ctx.contractGenDetails = (ctx.contractGenDetails || '') + '\n' + text;
+          await setContext(channelId, ctx);
+          return `✅ Informação recebida. Continue enviando os dados ou diga *"gerar"* quando quiser que eu monte o contrato.`;
+        }
+
+        const details = (ctx.contractGenDetails || '') + '\n' + text.replace(/^gerar/i, '').trim();
+        if (!details.trim() || details.trim().length < 20) {
+          return `⚠️ Ainda preciso dos detalhes do contrato (partes, valores, prazo). Por favor, envie as informações primeiro.`;
+        }
+
+        // Gerar contrato
+        ctx.state = 'idle';
+        ctx.contractGenType = null;
+        ctx.contractGenLabel = null;
+        ctx.contractGenDetails = null;
+        await setContext(channelId, ctx);
+
+        try {
+          const generated = await contractGenerator.generate({
+            type: ctx.contractGenType || 'prestacao_servicos',
+            details: details.trim(),
+          });
+          // Retornar objeto com documento para webhooks.js processar
+          return {
+            text: `✅ *Contrato gerado com sucesso!*\n\n📄 ${generated.title}\n\nClique no link abaixo para baixar o PDF:\n${generated.downloadUrl}`,
+            document: {
+              url: generated.downloadUrl,
+              fileName: generated.fileName,
+              caption: `Contrato: ${generated.title}`,
+            },
+          };
+        } catch (err) {
+          logger.error('Erro ao gerar contrato via WhatsApp:', err.message);
+          return `⚠️ Ocorreu um erro ao gerar o contrato. Tente novamente ou acesse o painel web.`;
+        }
+      }
+
       case 'deadline_calculate':
         response = handleDeadlineQuery(text);
         break;
@@ -132,13 +217,18 @@ async function handle(text, { channel, remoteId, userName }) {
 function detectIntent(text, ctx) {
   const lower = text.toLowerCase().trim();
 
-  // Se estava aguardando contrato
+  // Estados de espera têm prioridade
   if (ctx.state === 'awaiting_contract') return 'awaiting_contract';
+  if (ctx.state === 'awaiting_contract_gen_type') return 'awaiting_contract_gen_type';
+  if (ctx.state === 'awaiting_contract_gen_details') return 'awaiting_contract_gen_details';
 
   // Saudações
   if (/^(oi|olá|ola|hey|bom dia|boa tarde|boa noite|hello|hi)\b/.test(lower)) return 'greeting';
 
-  // Contrato
+  // Gerar contrato (antes de analisar, para não confundir)
+  if (/ger(e|ar|a)\s+contrato|cri(e|ar)\s+contrato|montar\s+contrato|fazer\s+contrato|novo contrato/.test(lower)) return 'contract_generate';
+
+  // Contrato (análise)
   if (/contrato|analis(ar|e)|cláusula|clausula|revisar contrato/.test(lower)) return 'contract_analyze';
 
   // Prazos
@@ -247,6 +337,7 @@ function formatGreeting(name) {
   return (
     `⚖️ Olá, ${name}! Sou o *Dr. Lex*, seu assistente jurídico com IA.\n\n` +
     `Como posso ajudar?\n` +
+    `• 📝 Gerar contratos em PDF\n` +
     `• 📄 Analisar contratos\n` +
     `• 📅 Calcular prazos\n` +
     `• 📰 Buscar no Diário Oficial\n` +
@@ -257,7 +348,8 @@ function formatGreeting(name) {
 function formatHelp() {
   return (
     `⚖️ *Dr. Lex - Menu de Ajuda*\n\n` +
-    `📄 *Contratos:* Envie "analisar contrato" e depois cole o texto\n` +
+    `📝 *Gerar contrato:* Envie "gerar contrato de prestação de serviços"\n` +
+    `📄 *Analisar contrato:* Envie "analisar contrato" e cole o texto\n` +
     `📅 *Prazos:* Envie "prazo contestação 2025-03-15"\n` +
     `📰 *Diários:* Envie "diário [palavra-chave]"\n` +
     `💬 *Dúvidas:* Pergunte qualquer questão jurídica\n\n` +

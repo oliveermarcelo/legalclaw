@@ -40,8 +40,18 @@ router.post('/evolution', async (req, res) => {
       userName: parsed.pushName || 'Usuário',
     });
 
-    // Enviar resposta via Evolution
-    await evolution.sendText(parsed.from, response);
+    // Verificar se a resposta inclui documento (ex: contrato gerado)
+    if (response && typeof response === 'object' && response.document) {
+      await evolution.sendText(parsed.from, response.text);
+      try {
+        await evolution.sendDocument(parsed.from, response.document.url, response.document.fileName, response.document.caption || '');
+      } catch (docErr) {
+        logger.warn('Falha ao enviar documento via WhatsApp, usando apenas link:', docErr.message);
+      }
+    } else {
+      // Resposta simples de texto
+      await evolution.sendText(parsed.from, typeof response === 'string' ? response : JSON.stringify(response));
+    }
   } catch (err) {
     logger.error('Erro no webhook Evolution:', err.message);
   }

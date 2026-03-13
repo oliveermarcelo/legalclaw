@@ -9,6 +9,7 @@ const ai = require('../services/ai');
 const legalWorkflows = require('../services/legal-workflows');
 const externalLegalSearch = require('../services/external-legal-search');
 const prospecting = require('../services/prospecting');
+const contractGenerator = require('../services/contract-generator');
 const logger = require('../utils/logger');
 
 const router = express.Router();
@@ -193,6 +194,57 @@ router.get('/contracts/:userId', async (req, res) => {
     res.json({ success: true, data: contracts });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao listar contratos' });
+  }
+});
+
+/**
+ * GET /api/contracts/generate/types
+ * Lista tipos de contratos disponíveis
+ */
+router.get('/contracts/generate/types', (req, res) => {
+  const types = Object.entries(contractGenerator.CONTRACT_TYPES).map(([key, cfg]) => ({
+    key,
+    label: cfg.label,
+    hints: cfg.hints,
+  }));
+  res.json({ success: true, data: types });
+});
+
+/**
+ * POST /api/contracts/generate
+ * Gera um contrato via IA e retorna o PDF
+ */
+router.post('/contracts/generate', async (req, res) => {
+  try {
+    const { type, details } = req.body;
+    if (!type) return res.status(400).json({ error: 'Tipo de contrato é obrigatório' });
+    if (!details) return res.status(400).json({ error: 'Detalhes do contrato são obrigatórios' });
+
+    const result = await contractGenerator.generate({
+      type,
+      details,
+      userId: req.user?.userId || null,
+    });
+
+    res.json({ success: true, data: result });
+  } catch (err) {
+    logger.error('Erro ao gerar contrato:', err.message);
+    res.status(500).json({ error: err.message || 'Erro ao gerar contrato' });
+  }
+});
+
+/**
+ * GET /api/contracts/generated
+ * Lista contratos gerados pelo usuário
+ */
+router.get('/contracts/generated', async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) return res.status(401).json({ error: 'Não autenticado' });
+    const list = await contractGenerator.listGenerated(userId);
+    res.json({ success: true, data: list });
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao listar contratos gerados' });
   }
 });
 
