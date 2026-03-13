@@ -54,6 +54,26 @@ const CONTRACT_TYPES = {
     label: 'Distrato / Rescisão',
     hints: 'Parte 1 (nome e CPF/CNPJ), Parte 2 (nome e CPF/CNPJ), contrato original a ser rescindido, data da rescisão, condições',
   },
+  procuracao: {
+    label: 'Procuração',
+    hints: 'Outorgante (nome, CPF/CNPJ, endereço, estado civil), Outorgado (nome, CPF/CNPJ), poderes conferidos (ex: representar em juízo, assinar documentos, receber valores), prazo de validade ou se é por tempo indeterminado',
+  },
+  estagio: {
+    label: 'Contrato de Estágio',
+    hints: 'Estagiário (nome, CPF, curso e instituição de ensino), Empresa/concedente (nome e CNPJ), supervisor (nome e cargo), área de estágio, carga horária semanal, valor da bolsa, vale-transporte, prazo (início e fim)',
+  },
+  confissao_divida: {
+    label: 'Confissão de Dívida / Acordo de Pagamento',
+    hints: 'Devedor (nome e CPF/CNPJ), Credor (nome e CPF/CNPJ), valor total da dívida, origem da dívida, forma de pagamento (parcelas, datas, juros e multa por atraso)',
+  },
+  contrato_trabalho: {
+    label: 'Contrato de Trabalho',
+    hints: 'Empregador (nome e CNPJ, endereço), Empregado (nome, CPF, função/cargo), data de admissão, salário, jornada de trabalho (dias e horários), tipo de contrato (prazo determinado ou indeterminado), benefícios',
+  },
+  permuta: {
+    label: 'Permuta (Troca de Bens)',
+    hints: 'Parte 1 (nome e CPF/CNPJ, bem que oferece e seu valor), Parte 2 (nome e CPF/CNPJ, bem que oferece e seu valor), eventual torna em dinheiro, estado dos bens, data da troca',
+  },
 };
 
 function getContractType(input) {
@@ -75,6 +95,11 @@ function getContractType(input) {
   if (/comodato|empr[eé]stimo de bem/.test(lower)) return { key: 'comodato', ...CONTRACT_TYPES.comodato };
   if (/parceria|joint|sociedade/.test(lower)) return { key: 'parceria_comercial', ...CONTRACT_TYPES.parceria_comercial };
   if (/distrato|rescis/.test(lower)) return { key: 'distrato', ...CONTRACT_TYPES.distrato };
+  if (/procura[çc]|mandato|outorga/.test(lower)) return { key: 'procuracao', ...CONTRACT_TYPES.procuracao };
+  if (/est[aá]gio|estagiário|estagi/.test(lower)) return { key: 'estagio', ...CONTRACT_TYPES.estagio };
+  if (/confiss[aã]o|d[íi]vida|acordo de pagamento|parcelar|parcela/.test(lower)) return { key: 'confissao_divida', ...CONTRACT_TYPES.confissao_divida };
+  if (/emprego|empreg|clt|trabalh[ao]r|admiss/.test(lower)) return { key: 'contrato_trabalho', ...CONTRACT_TYPES.contrato_trabalho };
+  if (/permuta|troca de bem|troca de im/.test(lower)) return { key: 'permuta', ...CONTRACT_TYPES.permuta };
   return null;
 }
 
