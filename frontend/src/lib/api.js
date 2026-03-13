@@ -12,6 +12,7 @@ function setToken(token) {
 function clearToken() {
   localStorage.removeItem('drlex_token');
   localStorage.removeItem('drlex_user');
+  localStorage.removeItem('drlex_org');
 }
 
 function getUser() {
@@ -22,6 +23,20 @@ function getUser() {
 
 function setUser(user) {
   localStorage.setItem('drlex_user', JSON.stringify(user));
+}
+
+function getOrg() {
+  if (typeof window === 'undefined') return null;
+  const raw = localStorage.getItem('drlex_org');
+  return raw ? JSON.parse(raw) : null;
+}
+
+function setOrg(org) {
+  if (org) {
+    localStorage.setItem('drlex_org', JSON.stringify(org));
+  } else {
+    localStorage.removeItem('drlex_org');
+  }
 }
 
 async function request(path, options = {}, timeoutMs = 15000) {
@@ -82,6 +97,7 @@ export async function login(email, password) {
   });
   setToken(data.data.token);
   setUser(data.data.user);
+  setOrg(data.data.org || null);
   return data.data;
 }
 
@@ -92,6 +108,7 @@ export async function register(name, email, password, whatsapp) {
   });
   setToken(data.data.token);
   setUser(data.data.user);
+  setOrg(data.data.org || null);
   return data.data;
 }
 
@@ -437,4 +454,104 @@ export async function chat(message, history = [], model = '') {
   return data.data || data;
 }
 
-export { getToken, getUser, clearToken };
+// Organizações
+export async function getOrgs() {
+  const data = await request('/api/orgs');
+  return data.data || [];
+}
+
+export async function createOrg(payload) {
+  const data = await request('/api/orgs', {
+    method: 'POST',
+    body: JSON.stringify(payload || {}),
+  });
+  return data.data;
+}
+
+export async function getOrgMembers(orgId) {
+  const data = await request(`/api/orgs/${orgId}/members`);
+  return data.data || [];
+}
+
+export async function inviteMember(orgId, email, role = 'member') {
+  const data = await request(`/api/orgs/${orgId}/invite`, {
+    method: 'POST',
+    body: JSON.stringify({ email, role }),
+  });
+  return data.data;
+}
+
+export async function removeMember(orgId, memberId) {
+  const data = await request(`/api/orgs/${orgId}/members/${memberId}`, {
+    method: 'DELETE',
+  });
+  return data;
+}
+
+export async function switchOrg(orgId) {
+  const data = await request('/api/orgs/switch', {
+    method: 'POST',
+    body: JSON.stringify({ orgId }),
+  });
+  setToken(data.data.token);
+  setOrg(data.data.org);
+  return data.data;
+}
+
+// Super Admin
+export async function adminGetStats() {
+  const data = await request('/api/admin/stats');
+  return data.data;
+}
+
+export async function adminGetUsers(params = {}) {
+  const qs = new URLSearchParams(
+    Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== ''))
+  ).toString();
+  const data = await request(`/api/admin/users${qs ? `?${qs}` : ''}`);
+  return data.data;
+}
+
+export async function adminUpdateUser(id, payload) {
+  const data = await request(`/api/admin/users/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+  return data.data;
+}
+
+export async function adminGetOrgs(params = {}) {
+  const qs = new URLSearchParams(
+    Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== ''))
+  ).toString();
+  const data = await request(`/api/admin/orgs${qs ? `?${qs}` : ''}`);
+  return data.data;
+}
+
+export async function adminUpdateOrg(id, payload) {
+  const data = await request(`/api/admin/orgs/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+  return data.data;
+}
+
+export async function adminGetPlans() {
+  const data = await request('/api/admin/plans');
+  return data.data;
+}
+
+export async function adminUpdateFeature(plan, feature, payload) {
+  const data = await request(`/api/admin/plans/${plan}/features/${feature}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+  return data.data;
+}
+
+export async function adminGetActivity() {
+  const data = await request('/api/admin/activity');
+  return data.data;
+}
+
+export { getToken, getUser, getOrg, clearToken };

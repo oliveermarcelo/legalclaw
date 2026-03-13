@@ -174,14 +174,15 @@ Responda APENAS JSON array: [{"i":0,"s":8},{"i":1,"s":2},...]`;
   }
 }
 
-async function saveSearch({ userId, tribunalAlias, specialty, filters, totalFound, aiSummary, results }) {
+async function saveSearch({ userId, orgId, tribunalAlias, specialty, filters, totalFound, aiSummary, results }) {
   try {
     await pool.query(
       `INSERT INTO prospecting_searches
-       (user_id, tribunal_alias, specialty, filters, total_found, ai_summary, results)
-       VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7::jsonb)`,
+       (user_id, org_id, tribunal_alias, specialty, filters, total_found, ai_summary, results)
+       VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8::jsonb)`,
       [
         userId || null,
+        orgId || null,
         tribunalAlias,
         specialty,
         JSON.stringify(filters || {}),
@@ -195,15 +196,17 @@ async function saveSearch({ userId, tribunalAlias, specialty, filters, totalFoun
   }
 }
 
-async function listSearchHistory(userId, limit = 10) {
+async function listSearchHistory(userId, limit = 10, orgId = null) {
   try {
+    const filter = orgId ? 'org_id = $1' : 'user_id = $1';
+    const param = orgId || userId;
     const result = await pool.query(
       `SELECT id, tribunal_alias, specialty, total_found, ai_summary, created_at
        FROM prospecting_searches
-       WHERE user_id = $1
+       WHERE ${filter}
        ORDER BY created_at DESC
        LIMIT $2`,
-      [userId, limit]
+      [param, limit]
     );
     return result.rows;
   } catch (err) {
@@ -212,7 +215,7 @@ async function listSearchHistory(userId, limit = 10) {
   }
 }
 
-async function searchOpportunities({ tribunalAlias, specialty, size = 20, monthsBack = 6, uf = null, userId = null }) {
+async function searchOpportunities({ tribunalAlias, specialty, size = 20, monthsBack = 6, uf = null, userId = null, orgId = null }) {
   if (!tribunalAlias) throw new Error('Selecione um tribunal para a prospecção.');
   if (!specialty) throw new Error('Informe a área jurídica para prospecção.');
 
@@ -245,7 +248,7 @@ async function searchOpportunities({ tribunalAlias, specialty, size = 20, months
   const { results = [], total } = searchResult;
 
   if (results.length === 0) {
-    await saveSearch({ userId, tribunalAlias, specialty, filters, totalFound: 0, aiSummary: null, results: [] });
+    await saveSearch({ userId, orgId, tribunalAlias, specialty, filters, totalFound: 0, aiSummary: null, results: [] });
     return {
       tribunalAlias,
       specialty: specConfig.label,
@@ -325,6 +328,7 @@ Em 3 parágrafos objetivos:
 
   await saveSearch({
     userId,
+    orgId,
     tribunalAlias,
     specialty,
     filters,

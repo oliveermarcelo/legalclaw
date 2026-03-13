@@ -12,10 +12,11 @@ import {
   MessageCircle,
   Newspaper,
   Scale,
+  Settings2,
   ShieldCheck,
   Target,
 } from 'lucide-react';
-import { getUser, logout } from '@/lib/api';
+import { getUser, getOrg, logout } from '@/lib/api';
 
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -33,6 +34,8 @@ const NAV_ITEMS = [
 export default function Sidebar() {
   const pathname = usePathname();
   const user = getUser();
+  const org = getOrg();
+  const isSuperAdmin = user?.is_super_admin === true;
 
   return (
     <aside className="w-72 min-h-screen flex flex-col border-r border-white/10 bg-gradient-to-b from-surface-950 via-[#0d1230] to-[#070b1c]">
@@ -49,6 +52,31 @@ export default function Sidebar() {
       </div>
 
       <nav className="flex-1 px-4 py-6 space-y-2.5">
+        {isSuperAdmin && (
+          <a
+            href="/admin"
+            className={[
+              'group flex items-center gap-3 rounded-2xl px-3 py-3 transition-all duration-200',
+              pathname.startsWith('/admin')
+                ? 'bg-gradient-to-r from-rose-700/40 to-rose-500/20 border border-rose-300/30 shadow-lg shadow-rose-900/20'
+                : 'border border-transparent hover:border-white/10 hover:bg-white/5',
+            ].join(' ')}
+          >
+            <span
+              className={[
+                'h-9 w-9 rounded-xl flex items-center justify-center transition-colors',
+                pathname.startsWith('/admin')
+                  ? 'bg-rose-500/30 text-rose-100'
+                  : 'bg-white/5 text-surface-300 group-hover:text-white',
+              ].join(' ')}
+            >
+              <Settings2 className="h-4 w-4" strokeWidth={2.3} />
+            </span>
+            <span className={pathname.startsWith('/admin') ? 'text-white font-semibold text-sm' : 'text-surface-200 text-sm'}>
+              Super Admin
+            </span>
+          </a>
+        )}
         {NAV_ITEMS.map((item) => {
           const isExact = pathname === item.href;
           const isNested = pathname.startsWith(`${item.href}/`);
@@ -97,8 +125,11 @@ export default function Sidebar() {
               <p className="text-sm font-semibold text-white truncate">{user?.name || 'Usuario'}</p>
               <div className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-brand-200">
                 <ShieldCheck className="h-3 w-3" strokeWidth={2.2} />
-                <span>{user?.plan || 'solo'}</span>
+                <span>{user?.plan || org?.plan || 'solo'}</span>
               </div>
+              {org?.name && (
+                <p className="mt-0.5 text-[11px] text-surface-400 truncate">{org.name}</p>
+              )}
             </div>
           </div>
         </div>

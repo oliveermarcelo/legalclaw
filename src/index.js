@@ -9,9 +9,11 @@ const fs = require('fs');
 const config = require('./config');
 const logger = require('./utils/logger');
 const { pool, migrate } = require('./config/migrate');
-const { authOptional, authRequired } = require('./utils/auth-middleware');
+const { authOptional, authRequired, requireSuperAdmin } = require('./utils/auth-middleware');
 const authRoutes = require('./routes/auth');
 const apiRoutes = require('./routes/api');
+const orgRoutes = require('./routes/orgs');
+const adminRoutes = require('./routes/admin');
 const webhookRoutes = require('./routes/webhooks');
 const evolution = require('./integrations/evolution');
 const ai = require('./services/ai');
@@ -137,6 +139,8 @@ app.get('/health', async (req, res) => {
 });
 
 app.use('/api/auth', authOptional, authRoutes);
+app.use('/api/admin', authRequired, requireSuperAdmin, adminRoutes);
+app.use('/api/orgs', authRequired, orgRoutes);
 app.use('/api', authRequired, apiRoutes);
 app.use('/webhooks', webhookRoutes);
 

@@ -15,23 +15,25 @@ const DIARIO_SOURCES = {
 /**
  * Cria um monitor de diário oficial
  */
-async function createMonitor(userId, { keywords, diarioType }) {
+async function createMonitor(userId, { keywords, diarioType }, orgId = null) {
   const res = await pool.query(
-    `INSERT INTO diario_monitors (user_id, keywords, diario_type)
-     VALUES ($1, $2, $3) RETURNING *`,
-    [userId, keywords, diarioType]
+    `INSERT INTO diario_monitors (user_id, org_id, keywords, diario_type)
+     VALUES ($1, $2, $3, $4) RETURNING *`,
+    [userId, orgId || null, keywords, diarioType]
   );
   logger.info('Monitor de diário criado', { id: res.rows[0].id, userId, diarioType, keywords });
   return res.rows[0];
 }
 
 /**
- * Lista monitores ativos de um usuário
+ * Lista monitores ativos escopados por org (ou por usuário como fallback)
  */
-async function listMonitors(userId) {
+async function listMonitors(userId, orgId = null) {
+  const filter = orgId ? 'org_id = $1' : 'user_id = $1';
+  const param = orgId || userId;
   const res = await pool.query(
-    `SELECT * FROM diario_monitors WHERE user_id = $1 AND active = true ORDER BY created_at DESC`,
-    [userId]
+    `SELECT * FROM diario_monitors WHERE ${filter} AND active = true ORDER BY created_at DESC`,
+    [param]
   );
   return res.rows;
 }
@@ -113,11 +115,12 @@ async function runScan() {
 
           if (existing.rows.length === 0 && result.url) {
             const alert = await pool.query(
-              `INSERT INTO diario_alerts (monitor_id, user_id, diario_type, edition_date, matched_keyword, excerpt, url)
-               VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+              `INSERT INTO diario_alerts (monitor_id, user_id, org_id, diario_type, edition_date, matched_keyword, excerpt, url)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
               [
                 monitor.id,
                 monitor.user_id,
+                monitor.org_id || null,
                 monitor.diario_type,
                 result.date || new Date(),
                 keyword,

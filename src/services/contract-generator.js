@@ -175,7 +175,7 @@ function generatePdfBuffer(title, contractText) {
   });
 }
 
-async function generate({ type, details, userId = null }) {
+async function generate({ type, details, userId = null, orgId = null }) {
   const typeConfig = getContractType(type);
   if (!typeConfig) {
     throw new Error('Tipo de contrato não reconhecido. Informe um tipo válido.');
@@ -203,9 +203,9 @@ async function generate({ type, details, userId = null }) {
   let contractId = null;
   try {
     const result = await pool.query(
-      `INSERT INTO generated_contracts (user_id, contract_type, title, details_text, contract_text, pdf_filename, pdf_url)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-      [userId || null, typeConfig.key, title, details, contractText, fileName, downloadUrl]
+      `INSERT INTO generated_contracts (user_id, org_id, contract_type, title, details_text, contract_text, pdf_filename, pdf_url)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+      [userId || null, orgId || null, typeConfig.key, title, details, contractText, fileName, downloadUrl]
     );
     contractId = result.rows[0]?.id;
   } catch (err) {
@@ -223,15 +223,17 @@ async function generate({ type, details, userId = null }) {
   };
 }
 
-async function listGenerated(userId, limit = 20) {
+async function listGenerated(userId, limit = 20, orgId = null) {
   try {
+    const filter = orgId ? 'org_id = $1' : 'user_id = $1';
+    const param = orgId || userId;
     const result = await pool.query(
       `SELECT id, contract_type, title, pdf_url, created_at
        FROM generated_contracts
-       WHERE user_id = $1
+       WHERE ${filter}
        ORDER BY created_at DESC
        LIMIT $2`,
-      [userId, limit]
+      [param, limit]
     );
     return result.rows;
   } catch (err) {

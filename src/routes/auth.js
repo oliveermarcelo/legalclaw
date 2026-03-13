@@ -11,6 +11,7 @@ const router = express.Router();
  * POST /api/auth/register
  */
 router.post('/register', async (req, res) => {
+  const client = await pool.connect();
   try {
     const { name, email, password, whatsapp } = req.body;
 
@@ -18,40 +19,61 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'Nome, email e senha são obrigatórios' });
     }
 
-    // Verificar se email já existe
-    const existing = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    const existing = await client.query('SELECT id FROM users WHERE email = $1', [email]);
     if (existing.rows.length > 0) {
       return res.status(409).json({ error: 'Email já cadastrado' });
     }
 
-    // Hash da senha
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // Criar usuário
-    const result = await pool.query(
+    await client.query('BEGIN');
+
+    const userResult = await client.query(
       `INSERT INTO users (name, email, password_hash, whatsapp, plan)
        VALUES ($1, $2, $3, $4, 'solo') RETURNING id, name, email, plan, whatsapp, created_at`,
       [name, email, passwordHash, whatsapp || null]
     );
+    const user = userResult.rows[0];
 
-    const user = result.rows[0];
+    // Criar org pessoal
+    const slugBase = email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '-');
+    let slug = slugBase;
+    let suffix = 1;
+    while ((await client.query('SELECT id FROM organizations WHERE slug = $1', [slug])).rows.length > 0) {
+      slug = `${slugBase}-${suffix++}`;
+    }
 
-    // Gerar JWT
+    const orgResult = await client.query(
+      `INSERT INTO organizations (name, slug, plan, owner_id) VALUES ($1, $2, 'solo', $3) RETURNING id, name, slug, plan`,
+      [name, slug, user.id]
+    );
+    const org = orgResult.rows[0];
+
+    await client.query(
+      `INSERT INTO org_memberships (org_id, user_id, role) VALUES ($1, $2, 'owner')`,
+      [org.id, user.id]
+    );
+
+    await client.query('COMMIT');
+
     const token = jwt.sign(
-      { userId: user.id, email: user.email, plan: user.plan },
+      { userId: user.id, email: user.email, plan: org.plan, orgId: org.id },
       config.jwt.secret,
       { expiresIn: config.jwt.expiresIn }
     );
 
-    logger.info('Novo usuário registrado:', { id: user.id, email: user.email });
+    logger.info('Novo usuário registrado:', { id: user.id, email: user.email, orgId: org.id });
 
     res.status(201).json({
       success: true,
-      data: { user, token },
+      data: { user, org, token },
     });
   } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
     logger.error('Erro no registro:', err.message);
     res.status(500).json({ error: 'Erro ao criar conta' });
+  } finally {
+    client.release();
   }
 });
 
@@ -68,7 +90,7 @@ router.post('/login', async (req, res) => {
 
     // Buscar usuário
     const result = await pool.query(
-      'SELECT id, name, email, password_hash, plan, whatsapp, active, created_at FROM users WHERE email = $1',
+      'SELECT id, name, email, password_hash, plan, whatsapp, active, is_super_admin, created_at FROM users WHERE email = $1',
       [email]
     );
 
@@ -88,9 +110,26 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Email ou senha inválidos' });
     }
 
-    // Gerar JWT
+    // Buscar org principal do usuário
+    const orgResult = await pool.query(
+      `SELECT o.id, o.name, o.slug, o.plan
+       FROM organizations o
+       JOIN org_memberships om ON om.org_id = o.id
+       WHERE om.user_id = $1 AND o.active = true
+       ORDER BY CASE om.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END, om.created_at ASC
+       LIMIT 1`,
+      [user.id]
+    );
+    const org = orgResult.rows[0] || null;
+
     const token = jwt.sign(
-      { userId: user.id, email: user.email, plan: user.plan },
+      {
+        userId: user.id,
+        email: user.email,
+        plan: org?.plan || user.plan,
+        orgId: org?.id || null,
+        isSuperAdmin: user.is_super_admin || false,
+      },
       config.jwt.secret,
       { expiresIn: config.jwt.expiresIn }
     );
@@ -100,7 +139,7 @@ router.post('/login', async (req, res) => {
 
     res.json({
       success: true,
-      data: { user, token },
+      data: { user, org, token },
     });
   } catch (err) {
     logger.error('Erro no login:', err.message);
@@ -128,22 +167,38 @@ router.get('/me', async (req, res) => {
       return res.status(404).json({ error: 'Usuário não encontrado' });
     }
 
-    // Buscar estatísticas
+    // Buscar orgs do usuário
+    const orgsResult = await pool.query(
+      `SELECT o.id, o.name, o.slug, o.plan, om.role
+       FROM organizations o
+       JOIN org_memberships om ON om.org_id = o.id
+       WHERE om.user_id = $1 AND o.active = true
+       ORDER BY CASE om.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END, om.created_at ASC`,
+      [req.user.userId]
+    );
+
+    const orgId = req.user.orgId || null;
+
+    // Buscar estatísticas (escopadas por org quando disponível)
+    const statsParams = orgId ? [orgId] : [req.user.userId];
+    const statsFilter = orgId ? 'org_id = $1' : 'user_id = $1';
     const stats = await pool.query(
       `SELECT
-        (SELECT COUNT(*) FROM contracts WHERE user_id = $1) as total_contracts,
-        (SELECT COUNT(*) FROM contracts WHERE user_id = $1 AND created_at >= NOW() - INTERVAL '30 days') as contracts_month,
-        (SELECT COUNT(*) FROM deadlines WHERE user_id = $1 AND status = 'active') as active_deadlines,
-        (SELECT COUNT(*) FROM deadlines WHERE user_id = $1 AND status = 'active' AND deadline_date <= NOW() + INTERVAL '3 days') as urgent_deadlines,
-        (SELECT COUNT(*) FROM diario_monitors WHERE user_id = $1 AND active = true) as active_monitors,
-        (SELECT COUNT(*) FROM diario_alerts WHERE user_id = $1 AND notified = false) as unread_alerts`,
-      [req.user.userId]
+        (SELECT COUNT(*) FROM contracts WHERE ${statsFilter}) as total_contracts,
+        (SELECT COUNT(*) FROM contracts WHERE ${statsFilter} AND created_at >= NOW() - INTERVAL '30 days') as contracts_month,
+        (SELECT COUNT(*) FROM deadlines WHERE ${statsFilter} AND status = 'active') as active_deadlines,
+        (SELECT COUNT(*) FROM deadlines WHERE ${statsFilter} AND status = 'active' AND deadline_date <= NOW() + INTERVAL '3 days') as urgent_deadlines,
+        (SELECT COUNT(*) FROM diario_monitors WHERE ${statsFilter} AND active = true) as active_monitors,
+        (SELECT COUNT(*) FROM diario_alerts WHERE ${statsFilter} AND notified = false) as unread_alerts`,
+      statsParams
     );
 
     res.json({
       success: true,
       data: {
         user: result.rows[0],
+        orgs: orgsResult.rows,
+        currentOrgId: orgId,
         stats: stats.rows[0],
       },
     });

@@ -51,7 +51,7 @@ function shouldAutoEscalateTo4o(modelConfig, requestedModel, contractTextLength)
 /**
  * Analisa um contrato e salva no banco
  */
-async function analyze(contractText, userId = null, title = '', options = {}) {
+async function analyze(contractText, userId = null, title = '', options = {}, orgId = null) {
   logger.info('Iniciando analise de contrato', { userId, textLength: contractText.length });
 
   const modelConfig = ai.getModelConfig();
@@ -117,12 +117,13 @@ async function analyze(contractText, userId = null, title = '', options = {}) {
   if (userId) {
     try {
       const res = await pool.query(
-        `INSERT INTO contracts (user_id, title, original_text, analysis, risk_level, status)
-         VALUES ($1, $2, $3, $4, $5, 'completed') RETURNING id`,
+        `INSERT INTO contracts (user_id, org_id, title, original_text, analysis, risk_level, status)
+         VALUES ($1, $2, $3, $4, $5, $6, 'completed') RETURNING id`,
         [
           userId,
+          orgId || null,
           title || result.parsed?.resumo?.tipo || 'Contrato',
-          contractText.substring(0, 10000), // limitar tamanho
+          contractText.substring(0, 10000),
           JSON.stringify(result.parsed || { raw: result.text }),
           riskLevel,
         ]
@@ -158,13 +159,15 @@ async function analyzeForChat(contractText, options = {}) {
 }
 
 /**
- * Lista contratos de um usuario
+ * Lista contratos escopados por org (ou por usuário como fallback)
  */
-async function listByUser(userId, limit = 20) {
+async function listByUser(userId, limit = 20, orgId = null) {
+  const filter = orgId ? 'org_id = $1' : 'user_id = $1';
+  const param = orgId || userId;
   const res = await pool.query(
     `SELECT id, title, risk_level, status, created_at
-     FROM contracts WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2`,
-    [userId, limit]
+     FROM contracts WHERE ${filter} ORDER BY created_at DESC LIMIT $2`,
+    [param, limit]
   );
   return res.rows;
 }
@@ -172,10 +175,12 @@ async function listByUser(userId, limit = 20) {
 /**
  * Busca contrato por ID
  */
-async function getById(contractId, userId) {
+async function getById(contractId, userId, orgId = null) {
+  const filter = orgId ? 'AND org_id = $2' : 'AND user_id = $2';
+  const param = orgId || userId;
   const res = await pool.query(
-    `SELECT * FROM contracts WHERE id = $1 AND user_id = $2`,
-    [contractId, userId]
+    `SELECT * FROM contracts WHERE id = $1 ${filter}`,
+    [contractId, param]
   );
   return res.rows[0] || null;
 }

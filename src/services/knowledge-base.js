@@ -75,6 +75,7 @@ async function createSource({
   sourceRef = null,
   metadata = {},
   createdBy = null,
+  orgId = null,
 }) {
   const safeTitle = String(title || '').trim();
   const normalizedContent = normalizeContent(content);
@@ -89,12 +90,11 @@ async function createSource({
 
   const contentHash = crypto.createHash('sha256').update(normalizedContent).digest('hex');
 
+  const dupFilter = orgId ? 'AND org_id = $2' : 'AND (($2::int IS NULL AND created_by IS NULL) OR created_by = $2)';
+  const dupParam = orgId || createdBy || null;
   const duplicated = await pool.query(
-    `SELECT id
-     FROM knowledge_sources
-     WHERE content_hash = $1
-       AND (($2::int IS NULL AND created_by IS NULL) OR created_by = $2)`,
-    [contentHash, createdBy || null]
+    `SELECT id FROM knowledge_sources WHERE content_hash = $1 ${dupFilter}`,
+    [contentHash, dupParam]
   );
 
   if (duplicated.rows.length > 0) {
@@ -121,8 +121,8 @@ async function createSource({
 
     const sourceResult = await client.query(
       `INSERT INTO knowledge_sources
-        (title, source_type, source_ref, content, content_hash, metadata, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)
+        (title, source_type, source_ref, content, content_hash, metadata, created_by, org_id)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8)
        RETURNING *`,
       [
         safeTitle,
@@ -132,6 +132,7 @@ async function createSource({
         contentHash,
         JSON.stringify(metadata || {}),
         createdBy || null,
+        orgId || null,
       ]
     );
 
@@ -168,13 +169,15 @@ async function createSource({
   }
 }
 
-async function listSources(limit = 50, createdBy = null) {
+async function listSources(limit = 50, createdBy = null, orgId = null) {
   const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
-  const hasOwnerFilter = Number.isInteger(createdBy);
   const params = [safeLimit];
   let whereClause = '';
 
-  if (hasOwnerFilter) {
+  if (orgId) {
+    whereClause = 'WHERE ks.org_id = $2';
+    params.push(orgId);
+  } else if (Number.isInteger(createdBy)) {
     whereClause = 'WHERE ks.created_by = $2';
     params.push(createdBy);
   }
@@ -192,11 +195,11 @@ async function listSources(limit = 50, createdBy = null) {
   return result.rows.map(mapSourceRow);
 }
 
-async function setSourceActive(sourceId, active, createdBy = null) {
-  const hasOwnerFilter = Number.isInteger(createdBy);
-  const whereOwner = hasOwnerFilter ? 'AND created_by = $3' : '';
-  const params = hasOwnerFilter
-    ? [sourceId, active, createdBy]
+async function setSourceActive(sourceId, active, createdBy = null, orgId = null) {
+  const whereOwner = orgId ? 'AND org_id = $3' : (Number.isInteger(createdBy) ? 'AND created_by = $3' : '');
+  const thirdParam = orgId || createdBy;
+  const params = thirdParam !== null && thirdParam !== undefined
+    ? [sourceId, active, thirdParam]
     : [sourceId, active];
 
   const result = await pool.query(
@@ -220,11 +223,16 @@ async function setSourceActive(sourceId, active, createdBy = null) {
   return mapped;
 }
 
-async function search(query, limit = 5, createdBy = null) {
+async function search(query, limit = 5, createdBy = null, orgId = null) {
   const q = String(query || '').trim();
   if (q.length < 3) return [];
 
   const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 5, 1), 10);
+
+  const ownerFilter = orgId
+    ? 'AND ks.org_id = $3'
+    : '($3::int IS NULL OR ks.created_by = $3)';
+  const ownerParam = orgId || createdBy || null;
 
   const result = await pool.query(
     `SELECT
@@ -239,14 +247,14 @@ async function search(query, limit = 5, createdBy = null) {
      FROM knowledge_chunks kc
      JOIN knowledge_sources ks ON ks.id = kc.source_id
      WHERE ks.active = true
-       AND ($3::int IS NULL OR ks.created_by = $3)
+       AND ${ownerFilter}
        AND (
          to_tsvector('portuguese', kc.content) @@ plainto_tsquery('portuguese', $1)
          OR kc.content ILIKE ('%' || $1 || '%')
        )
      ORDER BY rank DESC NULLS LAST, kc.id DESC
      LIMIT $2`,
-    [q, safeLimit * 3, createdBy || null]
+    [q, safeLimit * 3, ownerParam]
   );
 
   const seenSources = new Set();

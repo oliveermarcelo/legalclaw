@@ -131,10 +131,11 @@ router.post('/contracts/analyze', async (req, res) => {
   try {
     const { text, userId, title, model } = req.body;
     const resolvedUserId = req.user?.userId || userId || null;
+    const orgId = req.user?.orgId || null;
     if (!text || text.length < 50) {
       return res.status(400).json({ error: 'Texto do contrato muito curto (mínimo 50 caracteres)' });
     }
-    const result = await contractAnalyzer.analyze(text, resolvedUserId, title || '', { model });
+    const result = await contractAnalyzer.analyze(text, resolvedUserId, title || '', { model }, orgId);
     res.json({ success: true, data: result });
   } catch (err) {
     logger.error('Erro na análise de contrato:', err.message);
@@ -153,6 +154,7 @@ router.post('/contracts/analyze/pdf', uploadPdfMiddleware, async (req, res) => {
     }
 
     const resolvedUserId = req.user?.userId || req.body.userId || null;
+    const orgId = req.user?.orgId || null;
     const parsed = await pdfParse(req.file.buffer);
     const extractedText = String(parsed?.text || '').replace(/\u0000/g, ' ').trim();
 
@@ -165,7 +167,8 @@ router.post('/contracts/analyze/pdf', uploadPdfMiddleware, async (req, res) => {
       extractedText,
       resolvedUserId,
       title,
-      { model: req.body.model }
+      { model: req.body.model },
+      orgId
     );
 
     res.json({
@@ -190,7 +193,8 @@ router.post('/contracts/analyze/pdf', uploadPdfMiddleware, async (req, res) => {
  */
 router.get('/contracts/:userId', async (req, res) => {
   try {
-    const contracts = await contractAnalyzer.listByUser(parseInt(req.params.userId));
+    const orgId = req.user?.orgId || null;
+    const contracts = await contractAnalyzer.listByUser(parseInt(req.params.userId), 20, orgId);
     res.json({ success: true, data: contracts });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao listar contratos' });
@@ -224,6 +228,7 @@ router.post('/contracts/generate', async (req, res) => {
       type,
       details,
       userId: req.user?.userId || null,
+      orgId: req.user?.orgId || null,
     });
 
     res.json({ success: true, data: result });
@@ -241,7 +246,8 @@ router.get('/contracts/generated', async (req, res) => {
   try {
     const userId = req.user?.userId;
     if (!userId) return res.status(401).json({ error: 'Não autenticado' });
-    const list = await contractGenerator.listGenerated(userId);
+    const orgId = req.user?.orgId || null;
+    const list = await contractGenerator.listGenerated(userId, 20, orgId);
     res.json({ success: true, data: list });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao listar contratos gerados' });
@@ -296,13 +302,17 @@ router.post('/deadlines', async (req, res) => {
       return res.status(400).json({ error: 'deadlineDate ou startDate/dataInicial + dias sao obrigatorios' });
     }
 
-    const deadline = await deadlineManager.create(userId, {
-      processNumber,
-      description,
-      deadlineDate: resolvedDeadlineDate,
-      deadlineType,
-      diasUteis,
-    });
+    const deadline = await deadlineManager.create(
+      req.user?.userId || userId,
+      {
+        processNumber,
+        description,
+        deadlineDate: resolvedDeadlineDate,
+        deadlineType,
+        diasUteis,
+      },
+      req.user?.orgId || null
+    );
 
     res.json({ success: true, data: deadline });
   } catch (err) {
@@ -316,7 +326,8 @@ router.post('/deadlines', async (req, res) => {
  */
 router.get('/deadlines/:userId', async (req, res) => {
   try {
-    const deadlines = await deadlineManager.listActive(parseInt(req.params.userId));
+    const orgId = req.user?.orgId || null;
+    const deadlines = await deadlineManager.listActive(parseInt(req.params.userId), orgId);
     res.json({ success: true, data: deadlines });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao listar prazos' });
@@ -387,10 +398,12 @@ router.get('/deadlines/tipos/cpc', (req, res) => {
 router.post('/diarios/monitor', async (req, res) => {
   try {
     const { userId, keywords, diarioType } = req.body;
-    if (!userId || !keywords || !diarioType) {
-      return res.status(400).json({ error: 'userId, keywords e diarioType são obrigatórios' });
+    if (!keywords || !diarioType) {
+      return res.status(400).json({ error: 'keywords e diarioType são obrigatórios' });
     }
-    const monitor = await diarioMonitor.createMonitor(userId, { keywords, diarioType });
+    const resolvedUserId = req.user?.userId || userId || null;
+    const orgId = req.user?.orgId || null;
+    const monitor = await diarioMonitor.createMonitor(resolvedUserId, { keywords, diarioType }, orgId);
     res.json({ success: true, data: monitor });
   } catch (err) {
     logger.error('Erro ao criar monitor:', err.message);
@@ -403,7 +416,8 @@ router.post('/diarios/monitor', async (req, res) => {
  */
 router.get('/diarios/monitors/:userId', async (req, res) => {
   try {
-    const monitors = await diarioMonitor.listMonitors(parseInt(req.params.userId));
+    const orgId = req.user?.orgId || null;
+    const monitors = await diarioMonitor.listMonitors(parseInt(req.params.userId), orgId);
     res.json({ success: true, data: monitors });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao listar monitores' });
@@ -448,6 +462,7 @@ router.post('/knowledge/sources', async (req, res) => {
       sourceRef,
       metadata,
       createdBy: req.user?.userId || null,
+      orgId: req.user?.orgId || null,
     });
 
     res.json({ success: true, data: source });
@@ -469,7 +484,7 @@ router.post('/knowledge/sources', async (req, res) => {
 router.get('/knowledge/sources', async (req, res) => {
   try {
     const limit = parseInt(req.query.limit, 10) || 50;
-    const sources = await knowledgeBase.listSources(limit, req.user?.userId || null);
+    const sources = await knowledgeBase.listSources(limit, req.user?.userId || null, req.user?.orgId || null);
     res.json({ success: true, data: sources });
   } catch (err) {
     logger.error('Erro ao listar fontes de conhecimento:', err.message);
@@ -497,7 +512,8 @@ router.patch('/knowledge/sources/:id/active', async (req, res) => {
     const source = await knowledgeBase.setSourceActive(
       sourceId,
       active,
-      req.user?.userId || null
+      req.user?.userId || null,
+      req.user?.orgId || null
     );
 
     if (!source) {
@@ -526,7 +542,8 @@ router.post('/knowledge/search', async (req, res) => {
     const hits = await knowledgeBase.search(
       String(query),
       limit || 5,
-      req.user?.userId || null
+      req.user?.userId || null,
+      req.user?.orgId || null
     );
 
     res.json({ success: true, data: hits });
@@ -570,7 +587,8 @@ router.post('/external/processes/by-cnj', async (req, res) => {
     const result = await externalLegalSearch.searchProcessByCnj(
       numeroCnj,
       { tribunalAlias, size, from },
-      req.user?.userId || null
+      req.user?.userId || null,
+      req.user?.orgId || null
     );
     res.json({ success: true, data: result });
   } catch (err) {
@@ -587,7 +605,8 @@ router.post('/external/processes/search', async (req, res) => {
   try {
     const result = await externalLegalSearch.searchProcesses(
       req.body || {},
-      req.user?.userId || null
+      req.user?.userId || null,
+      req.user?.orgId || null
     );
     res.json({ success: true, data: result });
   } catch (err) {
@@ -710,7 +729,8 @@ router.get('/prospecting/history', async (req, res) => {
   try {
     const userId = req.user?.userId || null;
     if (!userId) return res.status(401).json({ error: 'Autenticação necessária' });
-    const history = await prospecting.listSearchHistory(userId, 20);
+    const orgId = req.user?.orgId || null;
+    const history = await prospecting.listSearchHistory(userId, 20, orgId);
     res.json({ success: true, data: history });
   } catch (err) {
     logger.error('Erro ao buscar histórico de prospecção:', err.message);
@@ -735,6 +755,7 @@ router.post('/prospecting/search', async (req, res) => {
       monthsBack,
       uf: uf || null,
       userId: req.user?.userId || null,
+      orgId: req.user?.orgId || null,
     });
 
     res.json({ success: true, data: result });
@@ -764,7 +785,8 @@ router.post('/chat', async (req, res) => {
       const hits = await knowledgeBase.search(
         String(message),
         5,
-        req.user?.userId || null
+        req.user?.userId || null,
+        req.user?.orgId || null
       );
 
       if (hits.length > 0) {

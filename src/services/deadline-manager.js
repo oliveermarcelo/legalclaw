@@ -78,25 +78,27 @@ function calcularPrazoCorridos(dataInicial, dias) {
 /**
  * Cria um novo prazo
  */
-async function create(userId, { processNumber, description, deadlineDate, deadlineType, diasUteis = true }) {
+async function create(userId, { processNumber, description, deadlineDate, deadlineType, diasUteis = true }, orgId = null) {
   const res = await pool.query(
-    `INSERT INTO deadlines (user_id, process_number, description, deadline_date, deadline_type, dias_uteis)
-     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-    [userId, processNumber, description, deadlineDate, deadlineType, diasUteis]
+    `INSERT INTO deadlines (user_id, org_id, process_number, description, deadline_date, deadline_type, dias_uteis)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+    [userId, orgId || null, processNumber, description, deadlineDate, deadlineType, diasUteis]
   );
   logger.info('Prazo criado', { id: res.rows[0].id, userId, date: deadlineDate });
   return res.rows[0];
 }
 
 /**
- * Lista prazos ativos de um usuário
+ * Lista prazos ativos escopados por org (ou por usuário como fallback)
  */
-async function listActive(userId) {
+async function listActive(userId, orgId = null) {
+  const filter = orgId ? 'org_id = $1' : 'user_id = $1';
+  const param = orgId || userId;
   const res = await pool.query(
     `SELECT * FROM deadlines
-     WHERE user_id = $1 AND status = 'active'
+     WHERE ${filter} AND status = 'active'
      ORDER BY deadline_date ASC`,
-    [userId]
+    [param]
   );
   return res.rows;
 }

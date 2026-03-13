@@ -105,6 +105,7 @@ function mapDatajudError(err) {
 
 async function logExternalCall({
   userId,
+  orgId,
   provider,
   operation,
   queryPayload,
@@ -115,10 +116,11 @@ async function logExternalCall({
   try {
     await pool.query(
       `INSERT INTO external_query_logs
-       (user_id, provider, operation, query_payload, status, latency_ms, error_message)
-       VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7)`,
+       (user_id, org_id, provider, operation, query_payload, status, latency_ms, error_message)
+       VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8)`,
       [
         userId || null,
+        orgId || null,
         provider,
         operation,
         JSON.stringify(queryPayload || {}),
@@ -160,7 +162,7 @@ async function executeDatajudSearch(alias, body) {
   return { total, hits };
 }
 
-async function searchProcessByCnj(numeroCnj, options = {}, userId = null) {
+async function searchProcessByCnj(numeroCnj, options = {}, userId = null, orgId = null) {
   const startedAt = Date.now();
   const formatted = formatCnj(numeroCnj);
   if (!formatted) {
@@ -197,6 +199,7 @@ async function searchProcessByCnj(numeroCnj, options = {}, userId = null) {
 
     await logExternalCall({
       userId,
+      orgId,
       provider: 'datajud',
       operation: 'process_by_cnj',
       queryPayload: { numeroCnj: formatted, aliases, pageSize },
@@ -215,6 +218,7 @@ async function searchProcessByCnj(numeroCnj, options = {}, userId = null) {
     const message = mapDatajudError(err);
     await logExternalCall({
       userId,
+      orgId,
       provider: 'datajud',
       operation: 'process_by_cnj',
       queryPayload: { numeroCnj: formatted, aliases, pageSize },
@@ -279,7 +283,7 @@ function buildAdvancedQuery(filters = {}) {
   };
 }
 
-async function searchProcesses(filters = {}, userId = null) {
+async function searchProcesses(filters = {}, userId = null, orgId = null) {
   const startedAt = Date.now();
   const alias = normalizeAlias(filters.tribunalAlias || config.externalLegal.datajudDefaultAlias);
   if (!alias) {
@@ -306,6 +310,7 @@ async function searchProcesses(filters = {}, userId = null) {
 
     await logExternalCall({
       userId,
+      orgId,
       provider: 'datajud',
       operation: 'advanced_search',
       queryPayload: { alias, filters: { ...filters, size, from } },
@@ -325,6 +330,7 @@ async function searchProcesses(filters = {}, userId = null) {
     const message = mapDatajudError(err);
     await logExternalCall({
       userId,
+      orgId,
       provider: 'datajud',
       operation: 'advanced_search',
       queryPayload: { alias, filters: { ...filters, size, from } },

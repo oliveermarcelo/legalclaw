@@ -142,7 +142,9 @@ async function handle(text, { channel, remoteId, userName }) {
           return `⚠️ Ainda preciso dos detalhes do contrato (partes, valores, prazo). Por favor, envie as informações primeiro.`;
         }
 
-        // Gerar contrato
+        // Capturar tipo antes de limpar o contexto
+        const contractType = ctx.contractGenType || 'prestacao_servicos';
+
         ctx.state = 'idle';
         ctx.contractGenType = null;
         ctx.contractGenLabel = null;
@@ -151,7 +153,7 @@ async function handle(text, { channel, remoteId, userName }) {
 
         try {
           const generated = await contractGenerator.generate({
-            type: ctx.contractGenType || 'prestacao_servicos',
+            type: contractType,
             details: details.trim(),
           });
           // Retornar objeto com documento para webhooks.js processar
